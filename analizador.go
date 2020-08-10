@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"log"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -10,41 +13,49 @@ import (
 //comando = strings.ToLower(comando)
 
 func analizarComandoPrincipal(entrada []string) {
-	switch strings.ToLower(entrada[0]) {
-	case "exec":
-		analizarParametrosExec(entrada)
-	case "pause":
-		pausaDeLaEjecucion()
-	case "mkdisk":
-		analizarParametrosMkdisk(entrada)
-	case "rmdisk":
-	case "fdisk":
-	case "mount":
-	case "unmount":
-	case "mkfs":
-	case "login":
-	case "logout":
-	case "mkgrp":
-	case "rmgrp":
-	case "mkusr":
-	case "rmusr":
-	case "chmod":
-	case "mkfile":
-	case "cat":
-	case "rm":
-	case "edit":
-	case "ren":
-	case "mkdir":
-	case "cp":
-	case "mv":
-	case "find":
-	case "chown":
-	case "chgrp":
-	case "loss":
-	case "recovery":
-	case "rep":
-	default:
-		fmt.Println("El comando ingresado no es valido")
+	if strings.Contains(entrada[0], "#") == false {
+		switch strings.ToLower(entrada[0]) {
+		case "exec":
+			analizarParametrosExec(entrada)
+		case "pause":
+			pausaDeLaEjecucion()
+		case "mkdisk":
+			analizarParametrosMkdisk(entrada)
+		case "rmdisk":
+			analizarParametrosRmdisk(entrada)
+		case "fdisk":
+			analizarParametrosFdisk(entrada)
+		case "mount":
+			analizarParametrosMount(entrada)
+		case "unmount":
+			analizarParametrosUnmount(entrada)
+		case "mkfs":
+		case "login":
+		case "logout":
+		case "mkgrp":
+		case "rmgrp":
+		case "mkusr":
+		case "rmusr":
+		case "chmod":
+		case "mkfile":
+		case "cat":
+		case "rm":
+		case "edit":
+		case "ren":
+		case "mkdir":
+		case "cp":
+		case "mv":
+		case "find":
+		case "chown":
+		case "chgrp":
+		case "loss":
+		case "recovery":
+		case "rep":
+		default:
+			fmt.Println("El comando ingresado no es valido")
+		}
+	} else {
+		fmt.Println("Has echo un comentario")
 	}
 }
 
@@ -110,9 +121,13 @@ func analizarParametrosExec(entrada []string) {
 
 	for i := 1; i < len(entrada); i++ {
 		aux := strings.Split(entrada[i], "->")
-		switch aux[0] {
-		case "-path":
-			path = obtenerPath(entrada, i)
+		if strings.Contains(aux[0], "#") == false {
+			switch aux[0] {
+			case "-path":
+				path = obtenerPath(entrada, i)
+			}
+		} else {
+			break
 		}
 	}
 
@@ -128,9 +143,13 @@ func analizarParametrosUnmount(entrada []string) {
 
 	for i := 1; i < len(entrada); i++ {
 		aux := strings.Split(entrada[i], "->")
-		match, _ := regexp.MatchString("-id([0-9]+)", strings.ToLower(aux[0]))
-		if match {
-			listado = append(listado, strings.ToLower(aux[1]))
+		if strings.Contains(aux[0], "#") == false {
+			match, _ := regexp.MatchString("-id([0-9]+)", strings.ToLower(aux[0]))
+			if match {
+				listado = append(listado, strings.ToLower(aux[1]))
+			}
+		} else {
+			break
 		}
 	}
 
@@ -227,7 +246,7 @@ func analizarParametrosRmdisk(entrada []string) {
 	}
 
 	if path != "vacio" {
-		//ir al metodo para el rmdisk
+		eliminarDisco(path)
 	} else {
 		fmt.Println("El comando ingresado no es valido")
 	}
@@ -241,27 +260,34 @@ func analizarParametrosMkdisk(entrada []string) {
 
 	for i := 1; i < len(entrada); i++ {
 		aux := strings.Split(entrada[i], "->")
-		switch strings.ToLower(aux[0]) {
-		case "-size":
-			size = obtenerTamanio(aux[1])
-		case "-path":
-			path = obtenerPath(entrada, i)
-		case "-name":
-			if strings.HasSuffix(aux[1], ".dsk") {
-				name = aux[1]
+		if strings.Contains(aux[0], "#") == false {
+			switch strings.ToLower(aux[0]) {
+			case "-size":
+				size = obtenerTamanio(aux[1])
+			case "-path":
+				path = obtenerPath(entrada, i)
+			case "-name":
+				if val := strings.ToLower(aux[1]); strings.HasSuffix(val, ".dsk") {
+					name = aux[1]
+				}
+			case "-unit":
+				if val := strings.ToLower(aux[1]); val == "k" || val == "m" {
+					unit = aux[1]
+				}
 			}
-		case "-unit":
-			if val := strings.ToLower(aux[1]); val == "k" || val == "m" {
-				unit = aux[1]
-			}
+		} else {
+			break
 		}
 	}
 
 	if path != "vacio" && size > 0 && name != "vacio" {
-		fmt.Print(unit)
-		//ir al metodo para el mkdisk
+		crearDisco(size, path, name, unit)
 	} else {
-		fmt.Println("El comando ingresado no es valido")
+		if size == -1 {
+			fmt.Println("El tamaño del disco ingresado es invalido")
+		} else {
+			fmt.Println("Revise los parametros del comando")
+		}
 	}
 }
 
@@ -270,8 +296,10 @@ func obtenerPath(entrada []string, posicion int) string {
 	if string(path1[1][0]) == "\"" {
 		path := path1[1] + entrada[posicion+1]
 		path = strings.ReplaceAll(path, "\"", "")
+		path = strings.ReplaceAll(path, "\n", "")
 		return path
 	}
+	path1[1] = strings.ReplaceAll(path1[1], "\n", "")
 	return path1[1]
 }
 
@@ -285,7 +313,33 @@ func obtenerTamanio(entrada string) int {
 }
 
 func lecturaDeArchivo(path string) {
+	bandera := false
+	contenido := ""
+	linea := ""
+	file, err := os.Open(path)
 
+	if err != nil {
+		fmt.Println("Error en la apertura del archivo")
+		log.Fatal(err)
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		if strings.Contains(scanner.Text(), "\\*") {
+			contenido = scanner.Text()
+			bandera = true
+		} else {
+			linea = scanner.Text()
+			if bandera {
+				bandera = false
+				linea = contenido + linea
+				linea = strings.ReplaceAll(linea, "\\*", "")
+			}
+			linea = strings.ReplaceAll(linea, "\n", "")
+			fmt.Println(linea)
+			analizarComandoPrincipal(strings.Split(linea, " "))
+		}
+	}
 }
 
 func pausaDeLaEjecucion() {
