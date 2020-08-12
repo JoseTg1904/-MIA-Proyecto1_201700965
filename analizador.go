@@ -166,11 +166,15 @@ func analizarParametrosMount(entrada []string) {
 
 	for i := 1; i < len(entrada); i++ {
 		aux := strings.Split(entrada[i], "->")
-		switch strings.ToLower(aux[0]) {
-		case "-path":
-			path = obtenerPath(entrada, i)
-		case "-name":
-			name = aux[1]
+		if strings.Contains(aux[0], "#") == false {
+			switch strings.ToLower(aux[0]) {
+			case "-path":
+				path = obtenerPath(entrada, i)
+			case "-name":
+				name = aux[1]
+			}
+		} else {
+			break
 		}
 	}
 
@@ -193,31 +197,35 @@ func analizarParametrosFdisk(entrada []string) {
 
 	for i := 1; i < len(entrada); i++ {
 		aux := strings.Split(entrada[i], "->")
-		switch strings.ToLower(aux[0]) {
-		case "-size":
-			size = obtenerTamanio(aux[1])
-		case "-unit":
-			if val := strings.ToLower(aux[1]); val == "b" || val == "k" || val == "m" {
-				unit = val
+		if strings.Contains(aux[0], "#") == false {
+			switch strings.ToLower(aux[0]) {
+			case "-size":
+				size = obtenerTamanio(aux[1])
+			case "-unit":
+				if val := strings.ToLower(aux[1]); val == "b" || val == "k" || val == "m" {
+					unit = val
+				}
+			case "-path":
+				path = obtenerPath(entrada, i)
+			case "-type":
+				if val := strings.ToLower(aux[1]); val == "p" || val == "e" || val == "l" {
+					tipo = val
+				}
+			case "-fit":
+				if val := strings.ToLower(aux[1]); val == "bf" || val == "ff" || val == "wf" {
+					fit = val
+				}
+			case "-delete":
+				if val := strings.ToLower(aux[1]); val == "fast" || val == "full" {
+					delete = val
+				}
+			case "-name":
+				name = aux[1]
+			case "-add":
+				add, _ = strconv.Atoi(aux[1])
 			}
-		case "-path":
-			path = obtenerPath(entrada, i)
-		case "-type":
-			if val := strings.ToLower(aux[1]); val == "p" || val == "e" || val == "l" {
-				tipo = val
-			}
-		case "-fit":
-			if val := strings.ToLower(aux[1]); val == "bf" || val == "ff" || val == "wf" {
-				fit = val
-			}
-		case "-delete":
-			if val := strings.ToLower(aux[1]); val == "fast" || val == "full" {
-				delete = val
-			}
-		case "-name":
-			name = aux[1]
-		case "-add":
-			add, _ = strconv.Atoi(aux[1])
+		} else {
+			break
 		}
 	}
 	if path != "vacio" && size > 0 && name != "vacio" {
@@ -239,9 +247,13 @@ func analizarParametrosRmdisk(entrada []string) {
 
 	for i := 1; i < len(entrada); i++ {
 		aux := strings.Split(entrada[i], "->")
-		switch strings.ToLower(aux[0]) {
-		case "-path":
-			path = obtenerPath(entrada, i)
+		if strings.Contains(aux[0], "#") == false {
+			switch strings.ToLower(aux[0]) {
+			case "-path":
+				path = obtenerPath(entrada, i)
+			}
+		} else {
+			break
 		}
 	}
 
@@ -326,13 +338,14 @@ func lecturaDeArchivo(path string) {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		if strings.Contains(scanner.Text(), "\\*") {
-			contenido = scanner.Text()
+			contenido += scanner.Text()
 			bandera = true
 		} else {
 			linea = scanner.Text()
 			if bandera {
 				bandera = false
 				linea = contenido + linea
+				contenido = ""
 				linea = strings.ReplaceAll(linea, "\\*", "")
 			}
 			linea = strings.ReplaceAll(linea, "\n", "")
@@ -343,6 +356,7 @@ func lecturaDeArchivo(path string) {
 }
 
 func pausaDeLaEjecucion() {
-	fmt.Println("Presione la tecla enter para continuar con la ejecucion c:")
-	fmt.Scanln()
+	fmt.Print("Presione la tecla enter para continuar con la ejecucion c:")
+	val := ""
+	fmt.Scanln(&val)
 }

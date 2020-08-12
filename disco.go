@@ -40,7 +40,7 @@ func crearDisco(size int, path, name, unit string) {
 
 //rmdisk
 func eliminarDisco(path string) {
-	fmt.Print("Seguro que desea eliminar el archivo [S/N]?: ")
+	fmt.Print("Seguro que desea eliminar el archivo ? [S/N]: ")
 	val := ""
 	fmt.Scanln(&val)
 	if strings.ToLower(val) == "s" {
