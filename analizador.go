@@ -187,7 +187,7 @@ func analizarParametrosMount(entrada []string) {
 
 func analizarParametrosFdisk(entrada []string) {
 	path := "vacio"
-	size := -1
+	size := int64(-1)
 	name := "vacio"
 	unit := "k"
 	tipo := "p"
@@ -266,7 +266,7 @@ func analizarParametrosRmdisk(entrada []string) {
 
 func analizarParametrosMkdisk(entrada []string) {
 	path := "vacio"
-	size := -1
+	size := int64(-1)
 	name := "vacio"
 	unit := "m"
 
@@ -315,13 +315,14 @@ func obtenerPath(entrada []string, posicion int) string {
 	return path1[1]
 }
 
-func obtenerTamanio(entrada string) int {
+func obtenerTamanio(entrada string) int64 {
 	size := -1
 	if val, _ := strconv.Atoi(entrada); val > 0 {
 		size, _ = strconv.Atoi(entrada)
-		return size
+		size1 := int64(size)
+		return size1
 	}
-	return size
+	return int64(-1)
 }
 
 func lecturaDeArchivo(path string) {
