@@ -14,10 +14,10 @@ import (
 var num_rand int16 = 0
 
 type discoMBR struct {
-	tamanio     int64
-	creacion    [16]byte
-	random      int16
-	particiones [4]particion
+	Tamanio     int64
+	Creacion    [16]byte
+	Random      int16
+	Particiones [4]particion
 }
 
 //mkdisk
@@ -31,10 +31,11 @@ func crearDisco(size int64, path, name, unit string) {
 	}
 
 	//creacion de carpetas necesarias para el almacenamiento del archivo
-	exec.Command("mkdir", "-p", path).Output()
+	pathAux := "\"" + path + "\""
+	exec.Command("mkdir", "-p", pathAux).Output()
 
 	//validacion de la existencia del archivo
-	if _, err := os.Open(path + "/" + name); os.IsExist(err) {
+	if _, err := os.Stat(path + "/" + name); err == nil {
 		fmt.Println("El archivo del disco ya existe")
 		return
 	}
@@ -49,10 +50,11 @@ func crearDisco(size int64, path, name, unit string) {
 		strconv.Itoa(tiempo.Year()) + " " + strconv.Itoa(tiempo.Hour()) + ":" + strconv.Itoa(tiempo.Minute())
 
 	//instancia del mbr y llenado de datos del mismo
-	mbr := discoMBR{tamanio: size,
-		random: num_rand}
+	mbr := discoMBR{}
+	mbr.Tamanio = size
+	mbr.Random = num_rand
 	num_rand++
-	copy(mbr.creacion[:], tiempoActual)
+	copy(mbr.Creacion[:], tiempoActual)
 
 	//llenado del archivo con valores de cero para obtener el tamaño especificado
 	buffer := bytes.NewBuffer([]byte{})
@@ -64,6 +66,7 @@ func crearDisco(size int64, path, name, unit string) {
 
 	//escritura del struct que representa el mbr en el archivo
 	archivo.Seek(0, 0)
+	buffer.Reset()
 	binary.Write(buffer, binary.BigEndian, &mbr)
 	archivo.Write(buffer.Bytes())
 

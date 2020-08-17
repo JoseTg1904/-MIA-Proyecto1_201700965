@@ -228,15 +228,15 @@ func analizarParametrosFdisk(entrada []string) {
 			break
 		}
 	}
-	if path != "vacio" && size > 0 && name != "vacio" {
+	if path != "vacio" && name != "vacio" {
 		if delete != "vacio" && add == 0 {
 			//eliminar particion
 		} else if delete == "vacio" && add != 0 {
 			//agregar espacio a la particion
-		} else if delete == "vacio" && add == 0 {
-			//crear particion
+		} else if delete == "vacio" && size > 0 {
+			crearParticion(size, unit, path, tipo, fit, name)
 		}
-		fmt.Print(unit, tipo, fit)
+
 	} else {
 		fmt.Println("El comando ingresado no es valido")
 	}
