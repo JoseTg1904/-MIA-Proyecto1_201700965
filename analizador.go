@@ -230,9 +230,9 @@ func analizarParametrosFdisk(entrada []string) {
 	}
 	if path != "vacio" && name != "vacio" {
 		if delete != "vacio" && add == 0 {
-			//eliminar particion
+			eliminarParticion(path, name, delete)
 		} else if delete == "vacio" && add != 0 {
-			//agregar espacio a la particion
+			modificarTamanioParticion(size, unit, path, name)
 		} else if delete == "vacio" && size > 0 {
 			crearParticion(size, unit, path, tipo, fit, name)
 		}
