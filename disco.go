@@ -60,6 +60,7 @@ func crearDisco(size int64, path, name, unit string) {
 	buffer := bytes.NewBuffer([]byte{})
 	binary.Write(buffer, binary.BigEndian, uint8(0))
 	archivo.Write(buffer.Bytes())
+
 	//corrimiento del puntero del archivo para alcanzar el tamaño especificado
 	archivo.Seek(size-int64(1), 0)
 	archivo.Write(buffer.Bytes())
