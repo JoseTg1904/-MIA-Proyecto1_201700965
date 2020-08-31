@@ -8,13 +8,13 @@ import (
 
 type discoMontado struct {
 	Path                string
-	Id                  string
+	ID                  string
 	ParticionesMontadas [100]particionMontada
 }
 
 type particionMontada struct {
 	Nombre [16]byte
-	Id     int
+	ID     int
 }
 
 var discosMontados [26]discoMontado
@@ -56,7 +56,7 @@ func montarParticion(path, name string) {
 			if discosMontados[i].ParticionesMontadas[j] != particionVacia {
 				contadorParticionesMontadas++
 			} else {
-				particion := particionMontada{Id: i + 1}
+				particion := particionMontada{ID: i + 1}
 				copy(particion.Nombre[:], name)
 				discosMontados[i].ParticionesMontadas[j] = particion
 				banderaParticionMontada = true
@@ -82,7 +82,7 @@ func montarParticion(path, name string) {
 		k := 0
 		for k = 0; k < 26; k++ {
 			if discosMontados[k] == discoVacio {
-				discosMontados[k] = discoMontado{Path: path, Id: arregloLetras[i]}
+				discosMontados[k] = discoMontado{Path: path, ID: arregloLetras[i]}
 				break
 			}
 		}
@@ -91,7 +91,7 @@ func montarParticion(path, name string) {
 			k = 25
 		}
 
-		particion := particionMontada{Id: 1}
+		particion := particionMontada{ID: 1}
 		copy(particion.Nombre[:], name)
 		discosMontados[k].ParticionesMontadas[0] = particion
 
@@ -108,7 +108,7 @@ func desmontarParticion(id string) {
 	banderaDesmontaje := false
 
 	for i := 0; i < 26; i++ {
-		if discosMontados[i].Id == disco {
+		if discosMontados[i].ID == disco {
 			discoAux = discosMontados[i]
 			break
 		}
@@ -116,7 +116,7 @@ func desmontarParticion(id string) {
 
 	if discoAux != discoVacio {
 		for i := 0; i < 100; i++ {
-			if discoAux.ParticionesMontadas[i].Id == particion {
+			if discoAux.ParticionesMontadas[i].ID == particion {
 				discoAux.ParticionesMontadas[i] = particionVacia
 				banderaDesmontaje = true
 			}
@@ -133,6 +133,18 @@ func desmontarParticion(id string) {
 	} else {
 		fmt.Println("El disco aun no se encuentra montado")
 		return
+	}
+}
+
+func mostrarParticionesMontadas() {
+	for i := 0; i < 26; i++ {
+		if discosMontados[i] != discoVacio {
+			for j := 0; j < 100; j++ {
+				if discosMontados[i].ParticionesMontadas[j] != particionVacia {
+					fmt.Println("id -> vd", discosMontados[i], discosMontados[i].ParticionesMontadas[j], " path -> ", discosMontados[i].Path, " name -> ", discosMontados[i].ParticionesMontadas[j])
+				}
+			}
+		}
 	}
 }
 

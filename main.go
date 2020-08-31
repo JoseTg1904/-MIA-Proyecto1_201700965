@@ -25,5 +25,6 @@ func main() {
 		}
 		comando = strings.ReplaceAll(comando, "\n", "")
 		analizarComandoPrincipal(strings.Split(comando, " "))
+		//formateoSistema(1073741824)
 	}
 }

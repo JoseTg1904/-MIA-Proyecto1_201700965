@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-var num_rand int16 = 0
+var numRand int16 = 0
 
 type discoMBR struct {
 	Tamanio     int64
@@ -45,15 +45,13 @@ func crearDisco(size int64, path, name, unit string) {
 	defer archivo.Close()
 
 	//obtencion de la fecha
-	tiempo := time.Now()
-	tiempoActual := strconv.Itoa(tiempo.Day()) + "/" + obtenerMes(tiempo.Month()) + "/" +
-		strconv.Itoa(tiempo.Year()) + " " + strconv.Itoa(tiempo.Hour()) + ":" + strconv.Itoa(tiempo.Minute())
+	tiempoActual := obtenerFecha()
 
 	//instancia del mbr y llenado de datos del mismo
 	mbr := discoMBR{}
 	mbr.Tamanio = size
-	mbr.Random = num_rand
-	num_rand++
+	mbr.Random = numRand
+	numRand++
 	copy(mbr.Creacion[:], tiempoActual)
 
 	//llenado del archivo con valores de cero para obtener el tamaño especificado
@@ -87,6 +85,12 @@ func eliminarDisco(path string) {
 			fmt.Println("El archivo a sido eliminado exitsamente")
 		}
 	}
+}
+
+func obtenerFecha() string {
+	tiempo := time.Now()
+	return strconv.Itoa(tiempo.Day()) + "/" + obtenerMes(tiempo.Month()) + "/" +
+		strconv.Itoa(tiempo.Year()) + " " + strconv.Itoa(tiempo.Hour()) + ":" + strconv.Itoa(tiempo.Minute())
 }
 
 func obtenerMes(mes time.Month) string {

@@ -10,8 +10,6 @@ import (
 	"strings"
 )
 
-//comando = strings.ToLower(comando)
-
 func analizarComandoPrincipal(entrada []string) {
 	if strings.Contains(entrada[0], "#") == false {
 		switch strings.ToLower(entrada[0]) {
@@ -30,6 +28,7 @@ func analizarComandoPrincipal(entrada []string) {
 		case "unmount":
 			analizarParametrosUnmount(entrada)
 		case "mkfs":
+			analizarParametrosMkfs(entrada)
 		case "login":
 		case "logout":
 		case "mkgrp":
@@ -85,37 +84,47 @@ func analizarParametrosLogin(entrada []string) {
 	}
 }
 
-/*
 func analizarParametrosMkfs(entrada []string) {
 	id := "vacio"
-	unit := "vacio"
-	tipo := "vacio"
+	unit := "k"
+	tipo := "full"
 	add := 0
 
 	for i := 1; i < len(entrada); i++ {
 		aux := strings.Split(entrada[i], "->")
-		switch aux[0] {
-		case "-id":
-			id = aux[1]
-		case "-tipo":
-			if aux[1] == "fast" || aux[1] == "full" {
-				tipo = aux[1]
+		if strings.Contains(aux[0], "#") == false {
+			switch strings.ToLower(aux[0]) {
+			case "-unit":
+				if val := strings.ToLower(aux[1]); val == "b" || val == "k" || val == "m" {
+					unit = val
+				}
+			case "-type":
+				if val := strings.ToLower(aux[1]); val == "fast" || val == "full" {
+					tipo = val
+				}
+			case "-add":
+				add, _ = strconv.Atoi(aux[1])
+			case "-id":
+				id = strings.ToLower(aux[1])
 			}
-		case "-add":
-			add, _ = strconv.Atoi(aux[1])
-		case "-unit":
-			if aux[1] == "b" || aux[1] == "k" || aux[1] == "m" {
-				unit = aux[1]
-			}
+		} else {
+			break
 		}
 	}
+
 	if id != "vacio" {
-		//ir al metodo para el mkdisk
+		if add != 0 {
+			//modifcar el tamaño del sistema de archivos
+			fmt.Println(unit)
+		} else {
+			//formatear la particion
+			fmt.Println(tipo)
+		}
 	} else {
 		fmt.Println("El comando ingresado no es valido")
 	}
 }
-*/
+
 func analizarParametrosExec(entrada []string) {
 	path := "vacio"
 
@@ -154,7 +163,9 @@ func analizarParametrosUnmount(entrada []string) {
 	}
 
 	if len(listado) > 0 {
-		//ir al metodo para leer el archivo
+		for i := 0; i < len(listado); i++ {
+			desmontarParticion(listado[i])
+		}
 	} else {
 		fmt.Println("El comando ingresado no es valido")
 	}
@@ -179,9 +190,9 @@ func analizarParametrosMount(entrada []string) {
 	}
 
 	if path != "vacio" && name != "vacio" {
-		//ir al metodo para el mkdisk
+		montarParticion(path, name)
 	} else {
-		//mostrara en la consola las particiones montadas
+		mostrarParticionesMontadas()
 	}
 }
 
