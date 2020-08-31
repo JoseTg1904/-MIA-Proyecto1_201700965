@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"unsafe"
 )
 
@@ -104,12 +106,29 @@ func calcularNoEstructras(tamanioParticion uint32) uint32 {
 		(27+TamArbolVirtual+TamDetalleDirectorio+(5*TamInodo+(20*TamBloque)+Bitacora))
 	*/
 
-	numerador := uint32(tamanioParticion - (uint32(2) * uint32(unsafe.Sizeof(super))))
-	denominador := uint32(uint32(27) + uint32(unsafe.Sizeof(avd)) + uint32(unsafe.Sizeof(dd)) + (uint32(5)*uint32(unsafe.Sizeof(inodo)) + (uint32(20) * uint32(unsafe.Sizeof(datos))) + uint32(unsafe.Sizeof(bitacora))))
+	numerador := uint32(tamanioParticion - (2 * uint32(unsafe.Sizeof(super))))
+	denominador := uint32(27 + uint32(unsafe.Sizeof(avd)) + uint32(unsafe.Sizeof(dd)) + (5*uint32(unsafe.Sizeof(inodo)) + (20 * uint32(unsafe.Sizeof(datos))) + uint32(unsafe.Sizeof(bitacora))))
 	return uint32(numerador / denominador)
 }
 
-func formateoSistema(tamanioParticion uint32, nombre string) {
+func formateoSistema(id, tipo string) {
+
+	disco, tamanioParticion, inicioParticion := obtenerDiscoMontado(id)
+	defer disco.Close()
+
+	if disco == nil {
+		return
+	}
+
+	if tipo == "full" {
+		disco.Seek(int64(inicioParticion), 0)
+		buffer := bytes.NewBuffer([]byte{})
+		binary.Write(buffer, binary.BigEndian, uint8(0))
+		for i := 0; i < int(tamanioParticion); i++ {
+			disco.Write(buffer.Bytes())
+		}
+	}
+
 	noEstructuras := calcularNoEstructras(tamanioParticion)
 	noInodos := uint32(5 * noEstructuras)
 	noBloques := uint32(20 * noEstructuras)
@@ -129,7 +148,7 @@ func formateoSistema(tamanioParticion uint32, nombre string) {
 		TamanioINodo:     uint16(unsafe.Sizeof(iNodo{})),
 		Carnet:           201700965}
 
-	copy(super.Nombre[:], nombre)
+	copy(super.Nombre[:], disco.Name())
 	copy(super.Creacion[:], obtenerFecha())
 	copy(super.UltimoMontaje[:], obtenerFecha())
 
@@ -151,4 +170,11 @@ func formateoSistema(tamanioParticion uint32, nombre string) {
 	super.InicioBLoques = posicion
 	posicion += (noBloques * uint32(super.TamanioBloque))
 	super.InicioLog = posicion
+
+	disco.Seek(int64(inicioParticion), 0)
+	buffer := bytes.NewBuffer([]byte{})
+	binary.Write(buffer, binary.BigEndian, &super)
+	disco.Write(buffer.Bytes())
+
+	//escribir la carpeta y el usuario.txt
 }

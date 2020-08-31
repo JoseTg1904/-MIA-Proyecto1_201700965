@@ -148,6 +148,56 @@ func mostrarParticionesMontadas() {
 	}
 }
 
+//archivo del disco, tamaño de la particion, inicio de la particion
+func obtenerDiscoMontado(id string) (*os.File, uint32, uint32) {
+	disco := string(id[2])
+	particion, _ := strconv.Atoi(id[2:len(id)])
+
+	discoAux := discoMontado{}
+	particionAux := particionMontada{}
+
+	for i := 0; i < 26; i++ {
+		if discosMontados[i].ID == disco {
+			discoAux = discosMontados[i]
+			break
+		}
+	}
+
+	if discoAux != discoVacio {
+		for i := 0; i < 100; i++ {
+			if discoAux.ParticionesMontadas[i].ID == particion {
+				particionAux = discoAux.ParticionesMontadas[i]
+				break
+			}
+		}
+
+		if particionAux != particionVacia {
+			archivo := buscarDisco(discoAux.Path)
+
+			mbrAux := obtenerMBR(archivo)
+
+			tamanio, inicio := uint32(0), uint32(0)
+
+			for i := 0; i < 4; i++ {
+				if mbrAux.Particiones[i].Nombre == particionAux.Nombre {
+					tamanio = uint32(mbrAux.Particiones[i].Tamanio)
+					inicio = uint32(mbrAux.Particiones[i].Inicio)
+					break
+				}
+			}
+
+			return nil, tamanio, inicio
+		} else {
+			fmt.Println("La particion no se a encontrado")
+			return nil, 0, 0
+		}
+
+	} else {
+		fmt.Println("El disco aun no se encuentra montado")
+		return nil, 0, 0
+	}
+}
+
 func buscarDisco(path string) *os.File {
 	if _, err := os.Stat(path); err == nil {
 		archivo, _ := os.OpenFile(path, os.O_RDWR, 0644)
