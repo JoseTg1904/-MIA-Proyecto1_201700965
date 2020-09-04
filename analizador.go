@@ -51,11 +51,47 @@ func analizarComandoPrincipal(entrada []string) {
 		case "loss":
 		case "recovery":
 		case "rep":
+			analizarParametrosRep(entrada)
 		default:
 			fmt.Println("El comando ingresado no es valido")
 		}
 	} else {
 		fmt.Println("Has echo un comentario")
+	}
+}
+
+func analizarParametrosRep(entrada []string) {
+	fmt.Println("simon si entre")
+	nombre := "vacio"
+	id := "vacio"
+	path := "vacio"
+	ruta := "vacio"
+
+	for i := 1; i < len(entrada); i++ {
+		aux := strings.Split(entrada[i], "->")
+		if strings.Contains(aux[0], "#") == false {
+			switch strings.ToLower(aux[0]) {
+			case "-ruta":
+				ruta = obtenerPath(entrada, i)
+			case "-path":
+				path = obtenerPath(entrada, i)
+			case "-id":
+				id = strings.ToLower(aux[1])
+			case "-nombre":
+				if val := strings.ToLower(aux[1]); val == "mbr" || val == "disk" || val == "sb" || val == "bm_arbdir" || val == "bm_detdir" || val == "bm_inode" || val == "bm_block" || val == "bitacora" || val == "directorio" || val == "tree_file" || val == "tree_directorio" || val == "tree_complete" || val == "ls" {
+					nombre = val
+				}
+			}
+		} else {
+			break
+		}
+	}
+
+	fmt.Println(id, path, nombre, ruta)
+	if id != "vacio" && path != "vacio" && nombre != "vacio" {
+		desicionReporte(id, path, ruta, nombre)
+	} else {
+		fmt.Println("El comando ingresado no es valido")
 	}
 }
 
