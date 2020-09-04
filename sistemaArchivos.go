@@ -3,8 +3,14 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
+	"os"
+	"strings"
 	"unsafe"
 )
+
+var existenciaAVD = false
+var posicionActualAVD = int64(0)
 
 type superBoot struct {
 	Nombre              [20]byte
@@ -42,20 +48,20 @@ type superBoot struct {
 type avd struct {
 	Creacion         [16]byte
 	Nombre           [20]byte
-	SubDirectorios   [6]uint32
-	ApuntadorDD      uint32
-	ApuntadoExtraAVD uint32
+	SubDirectorios   [6]int64
+	ApuntadorDD      int64
+	ApuntadoExtraAVD int64
 	Propietario      [20]byte
 }
 
 type detalleDirectorio struct {
 	ArregloArchivos  [5]estructuraInterndaDD
-	ApuntadorExtraDD uint32
+	ApuntadorExtraDD int64
 }
 
 type estructuraInterndaDD struct {
 	NombreArchivo  [20]byte
-	ApuntadorINodo uint32
+	ApuntadorINodo int64
 	Creacion       [16]byte
 	Modificacion   [16]byte
 }
@@ -64,8 +70,8 @@ type iNodo struct {
 	NoINodo                  uint32
 	TamanioArchivo           uint32
 	ContadorBloquesAsignados uint8
-	ApuntadroBloques         [4]uint32
-	ApuntadorExtraINodo      uint32
+	ApuntadroBloques         [4]int64
+	ApuntadorExtraINodo      int64
 	Propietario              [20]byte
 }
 
@@ -84,7 +90,7 @@ type bitacora struct {
 func calcularNoEstructras(tamanioParticion uint32) uint32 {
 	super := superBoot{}
 	avd := avd{}
-	//	interno := estructuraInterndaDD{}
+	//interno := estructuraInterndaDD{}
 	dd := detalleDirectorio{}
 	inodo := iNodo{}
 	datos := bloqueDatos{}
@@ -114,30 +120,28 @@ func calcularNoEstructras(tamanioParticion uint32) uint32 {
 func formateoSistema(id, tipo string) {
 
 	disco, tamanioParticion, inicioParticion := obtenerDiscoMontado(id)
-	defer disco.Close()
 
 	if disco == nil {
 		return
 	}
 
-	if tipo == "full" {
-		disco.Seek(int64(inicioParticion), 0)
-		buffer := bytes.NewBuffer([]byte{})
-		binary.Write(buffer, binary.BigEndian, uint8(0))
-		for i := 0; i < int(tamanioParticion); i++ {
-			disco.Write(buffer.Bytes())
-		}
+	disco.Seek(int64(inicioParticion), 0)
+	buffer := bytes.NewBuffer([]byte{})
+	binary.Write(buffer, binary.BigEndian, uint8(0))
+	for i := 0; i < int(tamanioParticion); i++ {
+		disco.Write(buffer.Bytes())
 	}
 
 	noEstructuras := calcularNoEstructras(tamanioParticion)
 	noInodos := uint32(5 * noEstructuras)
 	noBloques := uint32(20 * noEstructuras)
 
+	fmt.Println("estructuras:", noEstructuras, " Inodos:", noInodos, " bloques: ", noBloques)
 	super := superBoot{NoAVD: noEstructuras,
 		NoDD:             noEstructuras,
 		NoINodos:         noInodos,
 		NoBloques:        noBloques,
-		NoAVDLibres:      noEstructuras,
+		NoAVDLibres:      noEstructuras - 1,
 		NoDDLibres:       noEstructuras,
 		NoINodosLibres:   noInodos,
 		NoBloquesLibres:  noBloques,
@@ -148,7 +152,10 @@ func formateoSistema(id, tipo string) {
 		TamanioINodo:     uint16(unsafe.Sizeof(iNodo{})),
 		Carnet:           201700965}
 
-	copy(super.Nombre[:], disco.Name())
+	ruta := strings.Split(disco.Name(), "/")
+	ruta = strings.Split(ruta[len(ruta)-1], ".")
+
+	copy(super.Nombre[:], ruta[0])
 	copy(super.Creacion[:], obtenerFecha())
 	copy(super.UltimoMontaje[:], obtenerFecha())
 
@@ -172,9 +179,240 @@ func formateoSistema(id, tipo string) {
 	super.InicioLog = posicion
 
 	disco.Seek(int64(inicioParticion), 0)
-	buffer := bytes.NewBuffer([]byte{})
+	buffer.Reset()
 	binary.Write(buffer, binary.BigEndian, &super)
 	disco.Write(buffer.Bytes())
 
-	//escribir la carpeta y el usuario.txt
+	disco.Seek(int64(super.InicioBitMapAVD), 0)
+	buffer.Reset()
+	binary.Write(buffer, binary.BigEndian, uint8(1))
+	disco.Write(buffer.Bytes())
+
+	avd := avd{SubDirectorios: [6]int64{-1, -1, -1, -1, -1, -1},
+		ApuntadorDD:      -1,
+		ApuntadoExtraAVD: -1}
+	copy(avd.Creacion[:], obtenerFecha())
+	copy(avd.Nombre[:], "/")
+	copy(avd.Propietario[:], "root")
+
+	disco.Seek(int64(super.InicioAVD), 0)
+	buffer.Reset()
+	binary.Write(buffer, binary.BigEndian, &avd)
+	disco.Write(buffer.Bytes())
+
+	fmt.Println("Formateo de unidad completado con exito")
+	//escribir el usuario.txt
+	disco.Close()
+}
+
+func verificarExistenciaAVD(disco *os.File, inicioAVD int64, nombreHijo string) {
+	banderaEncontrado := false
+
+	nombre := [20]byte{}
+	copy(nombre[:], nombreHijo)
+
+	avdPadre := avd{}
+	avdAux := avd{}
+
+	//posicionando para leer la carpeta
+	disco.Seek(inicioAVD, 0)
+
+	contenido := make([]byte, int(unsafe.Sizeof(avd{})))
+	_, err := disco.Read(contenido)
+	if err != nil {
+		fmt.Println("Error en la lectura del disco")
+	}
+	buffer := bytes.NewBuffer(contenido)
+	err = binary.Read(buffer, binary.BigEndian, &avdPadre)
+	if err != nil {
+	}
+
+	i := 0
+	for i = 0; i < 6; i++ {
+		if avdPadre.SubDirectorios[i] != -1 {
+			disco.Seek(avdPadre.SubDirectorios[i], 0)
+			contenido := make([]byte, int(unsafe.Sizeof(avd{})))
+			_, err := disco.Read(contenido)
+			if err != nil {
+				fmt.Println("Error en la lectura del disco")
+			}
+			buffer := bytes.NewBuffer(contenido)
+			err = binary.Read(buffer, binary.BigEndian, &avdAux)
+			if err != nil {
+			}
+
+			if avdAux.Nombre == nombre {
+				banderaEncontrado = true
+				break
+			}
+		}
+	}
+
+	if i == 6 {
+		i = 5
+	}
+
+	if banderaEncontrado == false {
+		if avdPadre.ApuntadoExtraAVD != -1 {
+			verificarExistenciaAVD(disco, avdPadre.ApuntadoExtraAVD, nombreHijo)
+		} else {
+			existenciaAVD = false
+		}
+	} else {
+		existenciaAVD = true
+		posicionActualAVD = avdPadre.SubDirectorios[i]
+	}
+
+}
+
+func obtenerSuperBoot(disco *os.File, inicioParticion int64) superBoot {
+	superBootAux := superBoot{}
+	contenido := make([]byte, int(unsafe.Sizeof(superBootAux)))
+	disco.Seek(inicioParticion, 0)
+	_, err := disco.Read(contenido)
+	if err != nil {
+		fmt.Println("Error en la lectura del disco")
+	}
+	buffer := bytes.NewBuffer(contenido)
+	a := binary.Read(buffer, binary.BigEndian, &superBootAux)
+	if a != nil {
+	}
+	return superBootAux
+}
+
+func crearAVD(id, especial, ruta string) {
+	listado := strings.Split(ruta, "/")
+	listado[0] = "/"
+	fmt.Println(listado, len(listado))
+	disco, _, inicio := obtenerDiscoMontado(id)
+
+	superBoot := obtenerSuperBoot(disco, int64(inicio))
+
+	posicionActualAVD = int64(superBoot.InicioAVD)
+
+	if especial == "p" {
+		for i := 1; i < len(listado); i++ {
+			verificarExistenciaAVD(disco, posicionActualAVD, listado[i])
+			if existenciaAVD == false {
+				fmt.Println("simon no existe")
+				if superBoot.NoAVDLibres > 0 {
+					crearAVDIndividual(disco, int64(superBoot.InicioBitMapAVD), int64(superBoot.InicioAVD), posicionActualAVD, recorrerBitMapAVD(disco, superBoot.InicioBitMapAVD, superBoot.NoAVD), listado[i])
+					superBoot.NoAVDLibres--
+				}
+			}
+		}
+		disco.Seek(int64(inicio), 0)
+		buffer := bytes.NewBuffer([]byte{})
+		binary.Write(buffer, binary.BigEndian, &superBoot)
+		disco.Write(buffer.Bytes())
+		disco.Close()
+	}
+}
+
+func crearAVDIndividual(disco *os.File, iniciobitAVD, inicioAVDS, posicionAVDPadre, bitHijo int64, nombre string) {
+	carpetaAux := avd{}
+	disco.Seek(posicionAVDPadre, 0)
+	contenido := make([]byte, int(unsafe.Sizeof(carpetaAux)))
+	_, err := disco.Read(contenido)
+	if err != nil {
+		fmt.Println("Error en la lectura del disco")
+	}
+	buffer := bytes.NewBuffer(contenido)
+	a := binary.Read(buffer, binary.BigEndian, &carpetaAux)
+	if a != nil {
+	}
+	i := 0
+	contadorOcupados := 0
+	for i = 0; i < 6; i++ {
+		if carpetaAux.SubDirectorios[i] == -1 {
+			break
+		} else {
+			contadorOcupados++
+		}
+	}
+
+	if i == 6 {
+		i = 5
+	}
+
+	fmt.Println(contadorOcupados)
+	if contadorOcupados == 6 {
+		fmt.Println(carpetaAux.SubDirectorios)
+		crearAVDAnexo(disco, iniciobitAVD, inicioAVDS, bitHijo, carpetaAux.Nombre, nombre)
+	} else {
+		//creacion individual de la carpeta
+		carpetaNueva := avd{SubDirectorios: [6]int64{-1, -1, -1, -1, -1, -1},
+			ApuntadorDD:      -1,
+			ApuntadoExtraAVD: -1}
+		copy(carpetaNueva.Creacion[:], obtenerFecha())
+		copy(carpetaNueva.Nombre[:], nombre)
+		copy(carpetaNueva.Propietario[:], "root")
+
+		posicion := inicioAVDS + (bitHijo * int64(unsafe.Sizeof(avd{})))
+		carpetaAux.SubDirectorios[i] = posicion
+
+		disco.Seek(posicion, 0)
+
+		buffer.Reset()
+		binary.Write(buffer, binary.BigEndian, &carpetaNueva)
+		disco.Write(buffer.Bytes())
+
+		disco.Seek(iniciobitAVD+bitHijo, 0)
+
+		buffer.Reset()
+		binary.Write(buffer, binary.BigEndian, uint8(1))
+		disco.Write(buffer.Bytes())
+
+		disco.Seek(posicionAVDPadre, 0)
+		buffer.Reset()
+		binary.Write(buffer, binary.BigEndian, &carpetaAux)
+		disco.Write(buffer.Bytes())
+	}
+}
+
+func crearAVDAnexo(disco *os.File, iniciobitAVD, inicioAVDS, bitAnexa int64, nombre [20]byte, nombreHija string) {
+	carpetaNueva := avd{SubDirectorios: [6]int64{-1, -1, -1, -1, -1, -1},
+		ApuntadorDD:      -1,
+		ApuntadoExtraAVD: -1,
+		Nombre:           nombre}
+	copy(carpetaNueva.Creacion[:], obtenerFecha())
+	copy(carpetaNueva.Propietario[:], "root")
+
+	posicion := inicioAVDS + (bitAnexa * int64(unsafe.Sizeof(avd{})))
+
+	disco.Seek(posicion, 0)
+	buffer := bytes.NewBuffer([]byte{})
+	binary.Write(buffer, binary.BigEndian, &carpetaNueva)
+	disco.Write(buffer.Bytes())
+
+	disco.Seek(iniciobitAVD+bitAnexa, 0)
+	buffer.Reset()
+	binary.Write(buffer, binary.BigEndian, uint8(1))
+	disco.Write(buffer.Bytes())
+
+	crearAVDIndividual(disco, iniciobitAVD, inicioAVDS, posicion, bitAnexa+1, nombreHija)
+}
+
+func recorrerBitMapAVD(disco *os.File, inicioBitMap uint32, noAVD uint32) int64 {
+	bitMap := make([]byte, noAVD)
+	contenido := make([]byte, noAVD)
+
+	disco.Seek(int64(inicioBitMap), 0)
+	_, err := disco.Read(contenido)
+	if err != nil {
+		fmt.Println("Error en la lectura del disco")
+	}
+	buffer := bytes.NewBuffer(contenido)
+	a := binary.Read(buffer, binary.BigEndian, &bitMap)
+	if a != nil {
+	}
+
+	i := 0
+	for i = 0; i < len(bitMap); i++ {
+		if bitMap[i] == 0 {
+			break
+		}
+	}
+
+	return int64(i)
 }

@@ -53,7 +53,7 @@ func crearParticion(size int64, unit, path, tipo, fit, name string) {
 			if particionAux.Nombre == nombre {
 				banderaNombre = true
 			}
-			contTotales += 1
+			contTotales++
 		}
 	}
 

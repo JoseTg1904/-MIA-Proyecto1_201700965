@@ -42,6 +42,7 @@ func analizarComandoPrincipal(entrada []string) {
 		case "edit":
 		case "ren":
 		case "mkdir":
+			analizarParametrosMkdir(entrada)
 		case "cp":
 		case "mv":
 		case "find":
@@ -55,6 +56,34 @@ func analizarComandoPrincipal(entrada []string) {
 		}
 	} else {
 		fmt.Println("Has echo un comentario")
+	}
+}
+
+func analizarParametrosMkdir(entrada []string) {
+	id := "vacio"
+	path := "vacio"
+	especial := "vacio"
+
+	for i := 1; i < len(entrada); i++ {
+		aux := strings.Split(entrada[i], "->")
+		if strings.Contains(aux[0], "#") == false {
+			switch strings.ToLower(aux[0]) {
+			case "-p":
+				especial = "p"
+			case "-path":
+				path = obtenerPath(entrada, i)
+			case "-id":
+				id = strings.ToLower(aux[1])
+			}
+		} else {
+			break
+		}
+	}
+
+	if id != "vacio" && path != "vacio" {
+		crearAVD(id, especial, path)
+	} else {
+		fmt.Println("El comando ingresado no es valido")
 	}
 }
 
@@ -117,8 +146,7 @@ func analizarParametrosMkfs(entrada []string) {
 			//modifcar el tamaño del sistema de archivos
 			fmt.Println(unit)
 		} else {
-			//formatear la particion
-			fmt.Println(tipo)
+			formateoSistema(id, tipo)
 		}
 	} else {
 		fmt.Println("El comando ingresado no es valido")

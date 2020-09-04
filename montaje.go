@@ -82,7 +82,7 @@ func montarParticion(path, name string) {
 		k := 0
 		for k = 0; k < 26; k++ {
 			if discosMontados[k] == discoVacio {
-				discosMontados[k] = discoMontado{Path: path, ID: arregloLetras[i]}
+				discosMontados[k] = discoMontado{Path: path, ID: arregloLetras[k]}
 				break
 			}
 		}
@@ -141,7 +141,7 @@ func mostrarParticionesMontadas() {
 		if discosMontados[i] != discoVacio {
 			for j := 0; j < 100; j++ {
 				if discosMontados[i].ParticionesMontadas[j] != particionVacia {
-					fmt.Println("id -> vd", discosMontados[i], discosMontados[i].ParticionesMontadas[j], " path -> ", discosMontados[i].Path, " name -> ", discosMontados[i].ParticionesMontadas[j])
+					fmt.Println("id -> vd"+discosMontados[i].ID+strconv.Itoa(discosMontados[i].ParticionesMontadas[j].ID), " path ->", discosMontados[i].Path, " name ->", string(discosMontados[i].ParticionesMontadas[j].Nombre[:]))
 				}
 			}
 		}
@@ -151,7 +151,7 @@ func mostrarParticionesMontadas() {
 //archivo del disco, tamaño de la particion, inicio de la particion
 func obtenerDiscoMontado(id string) (*os.File, uint32, uint32) {
 	disco := string(id[2])
-	particion, _ := strconv.Atoi(id[2:len(id)])
+	particion, _ := strconv.Atoi(id[3:len(id)])
 
 	discoAux := discoMontado{}
 	particionAux := particionMontada{}
@@ -186,16 +186,16 @@ func obtenerDiscoMontado(id string) (*os.File, uint32, uint32) {
 				}
 			}
 
-			return nil, tamanio, inicio
-		} else {
-			fmt.Println("La particion no se a encontrado")
-			return nil, 0, 0
+			return archivo, tamanio, inicio
 		}
 
-	} else {
-		fmt.Println("El disco aun no se encuentra montado")
+		fmt.Println("La particion no se a encontrado")
 		return nil, 0, 0
+
 	}
+
+	fmt.Println("El disco aun no se encuentra montado")
+	return nil, 0, 0
 }
 
 func buscarDisco(path string) *os.File {
