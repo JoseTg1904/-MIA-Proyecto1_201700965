@@ -240,7 +240,7 @@ func verificarExistenciaAVD(disco *os.File, inicioAVD int64, nombreHijo string) 
 			err = binary.Read(buffer, binary.BigEndian, &avdAux)
 			if err != nil {
 			}
-
+			fmt.Println(i, ". nombre del interno", string(avdAux.Nombre[:]))
 			if avdAux.Nombre == nombre {
 				banderaEncontrado = true
 				break
@@ -253,7 +253,9 @@ func verificarExistenciaAVD(disco *os.File, inicioAVD int64, nombreHijo string) 
 	}
 
 	if banderaEncontrado == false {
+		fmt.Println("estoy lleno")
 		if avdPadre.ApuntadoExtraAVD != -1 {
+			fmt.Println("simon :'v")
 			verificarExistenciaAVD(disco, avdPadre.ApuntadoExtraAVD, nombreHijo)
 		} else {
 			existenciaAVD = false
@@ -296,7 +298,7 @@ func crearAVD(id, especial, ruta string) {
 			if existenciaAVD == false {
 				fmt.Println("simon no existe")
 				if superBoot.NoAVDLibres > 0 {
-					crearAVDIndividual(disco, int64(superBoot.InicioBitMapAVD), int64(superBoot.InicioAVD), posicionActualAVD, recorrerBitMapAVD(disco, superBoot.InicioBitMapAVD, superBoot.NoAVD), listado[i])
+					crearAVDIndividual(superBoot, disco, int64(superBoot.InicioBitMapAVD), int64(superBoot.InicioAVD), posicionActualAVD, recorrerBitMapAVD(disco, superBoot.InicioBitMapAVD, superBoot.NoAVD), listado[i])
 					superBoot.NoAVDLibres--
 				}
 			}
@@ -309,7 +311,7 @@ func crearAVD(id, especial, ruta string) {
 	}
 }
 
-func crearAVDIndividual(disco *os.File, iniciobitAVD, inicioAVDS, posicionAVDPadre, bitHijo int64, nombre string) {
+func crearAVDIndividual(super superBoot, disco *os.File, iniciobitAVD, inicioAVDS, posicionAVDPadre, bitHijo int64, nombre string) {
 	carpetaAux := avd{}
 	disco.Seek(posicionAVDPadre, 0)
 	contenido := make([]byte, int(unsafe.Sizeof(carpetaAux)))
@@ -335,10 +337,17 @@ func crearAVDIndividual(disco *os.File, iniciobitAVD, inicioAVDS, posicionAVDPad
 		i = 5
 	}
 
-	fmt.Println(contadorOcupados)
 	if contadorOcupados == 6 {
-		fmt.Println(carpetaAux.SubDirectorios)
-		crearAVDAnexo(disco, iniciobitAVD, inicioAVDS, bitHijo, carpetaAux.Nombre, nombre)
+		if super.NoAVDLibres >= 2 {
+			disco.Seek(posicionAVDPadre, 0)
+			carpetaAux.ApuntadoExtraAVD = inicioAVDS + (bitHijo * int64(unsafe.Sizeof(avd{})))
+			buffer.Reset()
+			binary.Write(buffer, binary.BigEndian, &carpetaAux)
+			disco.Write(buffer.Bytes())
+			crearAVDAnexo(super, disco, iniciobitAVD, inicioAVDS, bitHijo, carpetaAux.Nombre, nombre)
+		} else {
+			fmt.Println("a llegado al maximo de inserciones de carpetas posibles")
+		}
 	} else {
 		//creacion individual de la carpeta
 		carpetaNueva := avd{SubDirectorios: [6]int64{-1, -1, -1, -1, -1, -1},
@@ -370,7 +379,7 @@ func crearAVDIndividual(disco *os.File, iniciobitAVD, inicioAVDS, posicionAVDPad
 	}
 }
 
-func crearAVDAnexo(disco *os.File, iniciobitAVD, inicioAVDS, bitAnexa int64, nombre [20]byte, nombreHija string) {
+func crearAVDAnexo(super superBoot, disco *os.File, iniciobitAVD, inicioAVDS, bitAnexa int64, nombre [20]byte, nombreHija string) {
 	carpetaNueva := avd{SubDirectorios: [6]int64{-1, -1, -1, -1, -1, -1},
 		ApuntadorDD:      -1,
 		ApuntadoExtraAVD: -1,
@@ -390,7 +399,9 @@ func crearAVDAnexo(disco *os.File, iniciobitAVD, inicioAVDS, bitAnexa int64, nom
 	binary.Write(buffer, binary.BigEndian, uint8(1))
 	disco.Write(buffer.Bytes())
 
-	crearAVDIndividual(disco, iniciobitAVD, inicioAVDS, posicion, bitAnexa+1, nombreHija)
+	super.NoAVDLibres--
+
+	crearAVDIndividual(super, disco, iniciobitAVD, inicioAVDS, posicion, bitAnexa+1, nombreHija)
 }
 
 func recorrerBitMapAVD(disco *os.File, inicioBitMap uint32, noAVD uint32) int64 {
