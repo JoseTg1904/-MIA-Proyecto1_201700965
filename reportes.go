@@ -8,7 +8,10 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"unsafe"
 )
+
+var dotSalida = ""
 
 func desicionReporte(id, path, ruta, nombre string) {
 	switch nombre {
@@ -28,6 +31,7 @@ func desicionReporte(id, path, ruta, nombre string) {
 		reporteBMBloques(id, path)
 	case "bitacora":
 	case "directorio":
+		reporteDirectorio(id, path)
 	case "tree_file":
 	case "tree_directorio":
 	case "tree_complete":
@@ -322,6 +326,70 @@ func reporteBMBloques(id, path string) {
 	archivoSalida, _ := os.Create(pathSinComillas)
 	archivoSalida.WriteString(salida)
 	archivoSalida.Close()
+}
+
+func reporteDirectorio(id, path string) {
+	disco, _, inicio := obtenerDiscoMontado(id)
+	sb := obtenerSuperBoot(disco, int64(inicio))
+
+	dotSalida = "digraph AVD{\n"
+	dotSalida += "graph[overlap = \"false\", splines = \"true\"]\n"
+	recorridoIndividualAVD(disco, int64(sb.InicioAVD), int64(sb.InicioAVD), 0)
+	dotSalida += "}"
+
+	pathSinComillas := strings.ReplaceAll(path, "\"", "")
+	aux := strings.Split(pathSinComillas, ".")
+	pathDot := aux[0] + ".dot"
+	pathImagen := aux[0] + ".png"
+	archivoSalida, _ := os.Create(pathDot)
+	archivoSalida.WriteString(dotSalida)
+	archivoSalida.Close()
+
+	exec.Command("dot", pathDot, "-Tpng", "-o", pathImagen).Output()
+}
+
+func recorridoIndividualAVD(disco *os.File, inicioAvd, posicionActualAVD, bitActual int64) {
+
+	disco.Seek(posicionActualAVD, 0)
+
+	avdAux := avd{}
+	contenido := make([]byte, int(unsafe.Sizeof(avdAux)))
+	_, err := disco.Read(contenido)
+	if err != nil {
+	}
+	buffer := bytes.NewBuffer(contenido)
+	a := binary.Read(buffer, binary.BigEndian, &avdAux)
+	if a != nil {
+	}
+
+	dotSalida += "AVD" + strconv.Itoa(int(bitActual)) + " [shape=\"plaintext\" label= <<table>\n"
+	dotSalida += "<tr><td colspan=\"8\">" + retornarStringLimpio(avdAux.Nombre[:]) + "</td></tr>"
+
+	dotSalida += "<tr>\n"
+	dotSalida += "<td port=\"0\"></td>\n"
+	dotSalida += "<td port=\"1\"></td>\n"
+	dotSalida += "<td port=\"2\"></td>\n"
+	dotSalida += "<td port=\"3\"></td>\n"
+	dotSalida += "<td port=\"4\"></td>\n"
+	dotSalida += "<td port=\"5\"></td>\n"
+	dotSalida += "<td port=\"6\"></td>\n"
+	dotSalida += "<td port=\"7\"></td>\n"
+	dotSalida += "</tr>\n"
+	dotSalida += "</table>>]\n"
+
+	for i := 0; i < 6; i++ {
+		if avdAux.SubDirectorios[i] != -1 {
+			bitAux := (avdAux.SubDirectorios[i] - inicioAvd) / int64(unsafe.Sizeof(avd{}))
+			dotSalida += "AVD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(i) + " -> " + " AVD" + strconv.Itoa(int(bitAux)) + "\n"
+			recorridoIndividualAVD(disco, inicioAvd, avdAux.SubDirectorios[i], bitAux)
+		}
+	}
+
+	if avdAux.ApuntadoExtraAVD != -1 {
+		bitAux := (avdAux.ApuntadoExtraAVD - inicioAvd) / int64(unsafe.Sizeof(avd{}))
+		dotSalida += "AVD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(7) + " -> " + " AVD" + strconv.Itoa(int(bitAux)) + "\n"
+		recorridoIndividualAVD(disco, inicioAvd, avdAux.ApuntadoExtraAVD, bitAux)
+	}
 }
 
 func retornarStringLimpio(entrada []byte) string {
