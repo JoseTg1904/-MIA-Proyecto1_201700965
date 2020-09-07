@@ -334,10 +334,12 @@ func eliminarParticion(path, name, tipoELiminacion string) {
 				archivo.Write(buffer.Bytes())
 			}
 			mbrAux.Particiones[i] = particionVacia
+			desmontarParticionEliminada(path, name)
 			fmt.Println("Eliminacion de particion completa, realizada con exito")
 			return
 		} else if tipoELiminacion == "fast" {
 			mbrAux.Particiones[i] = particionVacia
+			desmontarParticionEliminada(path, name)
 			fmt.Println("Eliminacion de particion rapida, realizada con exito")
 			return
 		}

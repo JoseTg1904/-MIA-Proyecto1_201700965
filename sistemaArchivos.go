@@ -604,7 +604,6 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 				binary.Write(bufferEscritura, binary.BigEndian, &bloque)
 				disco.Write(bufferEscritura.Bytes())
 				inodoAux.ApuntadroBloques[iterador] = posicionBloque
-				fmt.Println(posicionBloque)
 				bufferEscritura.Reset()
 				disco.Seek(int64(super.InicioBitMapBloques)+bitBloque, 0)
 				binary.Write(bufferEscritura, binary.BigEndian, uint8(1))
@@ -632,7 +631,6 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 			binary.Write(bufferEscritura, binary.BigEndian, &inodoAux)
 			disco.Write(bufferEscritura.Bytes())
 			bitInodo = recorrerBitMapInodo(disco, super.InicioBitMapINodo, super.NoINodos)
-			fmt.Println("bit actual", bitInodo)
 			posicionINodo = int64(super.InicioINodo) + (bitInodo * int64(unsafe.Sizeof(iNodo{})))
 			super.NoINodosLibres = super.NoINodosLibres - 1
 		}
@@ -850,7 +848,6 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 				binary.Write(bufferEscritura, binary.BigEndian, &bloque)
 				disco.Write(bufferEscritura.Bytes())
 				inodoAux.ApuntadroBloques[iterador] = posicionBloque
-				fmt.Println(posicionBloque)
 				bufferEscritura.Reset()
 				disco.Seek(int64(super.InicioBitMapBloques)+bitBloque, 0)
 				binary.Write(bufferEscritura, binary.BigEndian, uint8(1))

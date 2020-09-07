@@ -51,6 +51,23 @@ func montarParticion(path, name string) {
 
 		banderaParticionMontada := false
 		contadorParticionesMontadas := 0
+		banderaParticionDuplicada := false
+		nombreAux := [16]byte{}
+		copy(nombreAux[:], name)
+
+		for j := 0; j < 100; j++ {
+			if discosMontados[i].ParticionesMontadas[j] != particionVacia {
+				if discosMontados[i].ParticionesMontadas[j].Nombre == nombreAux {
+					banderaParticionDuplicada = true
+					break
+				}
+			}
+		}
+
+		if banderaParticionDuplicada {
+			fmt.Println("la particion ya se encuentra montada")
+			return
+		}
 
 		for j := 0; j < 100; j++ {
 			if discosMontados[i].ParticionesMontadas[j] != particionVacia {
@@ -204,4 +221,39 @@ func buscarDisco(path string) *os.File {
 		return archivo
 	}
 	return nil
+}
+
+func desmontarDiscoEliminado(path string) {
+	for i := 0; i < 26; i++ {
+		if discosMontados[i].Path == path {
+			discosMontados[i] = discoMontado{}
+			break
+		}
+	}
+}
+
+func desmontarParticionEliminada(path, nombre string) {
+	discoAux := discoMontado{}
+	vacia := particionMontada{}
+	vacio := discoMontado{}
+	nombreAux := [16]byte{}
+	copy(nombreAux[:], nombre)
+
+	for i := 0; i < 26; i++ {
+		if discosMontados[i].Path == path {
+			discoAux = discosMontados[i]
+			break
+		}
+	}
+
+	if discoAux != vacio {
+		for j := 0; j < 100; j++ {
+			if discoAux.ParticionesMontadas[j] != vacia {
+				if discoAux.ParticionesMontadas[j].Nombre == nombreAux {
+					discoAux.ParticionesMontadas[j] = vacia
+					break
+				}
+			}
+		}
+	}
 }

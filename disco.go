@@ -83,6 +83,7 @@ func eliminarDisco(path string) {
 			fmt.Println("Error en la eliminacion del archivo")
 		} else {
 			fmt.Println("El archivo a sido eliminado exitsamente")
+			desmontarDiscoEliminado(path)
 		}
 	}
 }
