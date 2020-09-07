@@ -102,8 +102,8 @@ func recorrerINodo(disco *os.File, posicionActualINodo, bitActual int64) {
 	dotSalida += "<tr><td port=\"3\"></td></tr>\n"
 	dotSalida += "<tr><td port=\"4\"></td></tr>\n"
 	dotSalida += "</table>>]\n"
-
-	for i := 0; i < 3; i++ {
+	fmt.Println("actual", posicionActualINodo, " extra", inodoAux.ApuntadorExtraINodo)
+	for i := 0; i < 4; i++ {
 		if inodoAux.ApuntadroBloques[i] != -1 {
 			bitAux := (inodoAux.ApuntadroBloques[i] - int64(super.InicioBLoques)) / int64(unsafe.Sizeof(bloqueDatos{}))
 			dotSalida += "INodo" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(i) + " -> " + " Bloque" + strconv.Itoa(int(bitAux)) + "\n"
@@ -135,7 +135,7 @@ func recorrerDD(disco *os.File, posicionActualDD, bitActual int64) {
 
 	dotSalida += "DD" + strconv.Itoa(int(bitActual)) + " [shape=\"plaintext\" label= <<table>\n"
 	dotSalida += "<tr><td>Detalle de directorio</td></tr>"
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 5; i++ {
 		if ddAux.ArregloArchivos[i] != internoVacio {
 			dotSalida += "<tr><td port=" + "\"" + strconv.Itoa(i) + "\">" + retornarStringLimpio(ddAux.ArregloArchivos[i].NombreArchivo[:]) + "</td></tr>\n"
 		} else {
@@ -145,7 +145,7 @@ func recorrerDD(disco *os.File, posicionActualDD, bitActual int64) {
 	dotSalida += "<tr><td port=\"5\"></td></tr>\n"
 	dotSalida += "</table>>]\n"
 
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 5; i++ {
 		if ddAux.ArregloArchivos[i] != internoVacio {
 			bitAux := (ddAux.ArregloArchivos[i].ApuntadorINodo - int64(super.InicioINodo)) / int64(unsafe.Sizeof(iNodo{}))
 			dotSalida += "DD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(i) + " -> " + " INodo" + strconv.Itoa(int(bitAux)) + "\n"

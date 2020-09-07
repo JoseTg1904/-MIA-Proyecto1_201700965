@@ -66,7 +66,7 @@ func analizarParametrosMkfile(entrada []string) {
 	path := "vacio"
 	especial := "vacio"
 	size := -1
-	cont := "vacio"
+	cont := ""
 
 	for i := 1; i < len(entrada); i++ {
 		aux := strings.Split(entrada[i], "->")
