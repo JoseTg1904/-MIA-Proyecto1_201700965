@@ -37,6 +37,7 @@ func analizarComandoPrincipal(entrada []string) {
 		case "rmusr":
 		case "chmod":
 		case "mkfile":
+			analizarParametrosMkfile(entrada)
 		case "cat":
 		case "rm":
 		case "edit":
@@ -60,8 +61,46 @@ func analizarComandoPrincipal(entrada []string) {
 	}
 }
 
+func analizarParametrosMkfile(entrada []string) {
+	id := "vacio"
+	path := "vacio"
+	especial := "vacio"
+	size := -1
+	cont := "vacio"
+
+	for i := 1; i < len(entrada); i++ {
+		aux := strings.Split(entrada[i], "->")
+		if strings.Contains(aux[0], "#") == false {
+			switch strings.ToLower(aux[0]) {
+			case "-p":
+				especial = "p"
+			case "-path":
+				path = obtenerPath(entrada, i)
+			case "-id":
+				id = strings.ToLower(aux[1])
+			case "-size":
+				if val, _ := strconv.Atoi(aux[1]); val >= 0 {
+					size, _ = strconv.Atoi(aux[1])
+				} else {
+					fmt.Print("\nEl parametro size debe de ser igual o mayor a cero\n\n")
+					return
+				}
+			case "-cont":
+				cont = aux[1]
+			}
+		} else {
+			break
+		}
+	}
+
+	if id != "vacio" && path != "vacio" {
+		crearArchivo(id, especial, path, cont, int64(size))
+	} else {
+		fmt.Print("\nEl comando ingresado no es valido\n\n")
+	}
+}
+
 func analizarParametrosRep(entrada []string) {
-	fmt.Println("simon si entre")
 	nombre := "vacio"
 	id := "vacio"
 	path := "vacio"
@@ -87,7 +126,6 @@ func analizarParametrosRep(entrada []string) {
 		}
 	}
 
-	fmt.Println(id, path, nombre, ruta)
 	if id != "vacio" && path != "vacio" && nombre != "vacio" {
 		desicionReporte(id, path, ruta, nombre)
 	} else {
@@ -432,7 +470,7 @@ func lecturaDeArchivo(path string) {
 }
 
 func pausaDeLaEjecucion() {
-	fmt.Print("Presione la tecla enter para continuar con la ejecucion c:")
+	fmt.Print("\nPresione la tecla enter para continuar con la ejecucion c:\n")
 	val := ""
 	fmt.Scanln(&val)
 }

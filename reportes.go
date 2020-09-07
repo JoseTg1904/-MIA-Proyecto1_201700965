@@ -35,7 +35,178 @@ func desicionReporte(id, path, ruta, nombre string) {
 	case "tree_file":
 	case "tree_directorio":
 	case "tree_complete":
+		reporteTreeComplete(id, path)
 	case "ls":
+	}
+}
+
+func reporteTreeComplete(id, path string) {
+	disco, _, inicio := obtenerDiscoMontado(id)
+
+	sb := obtenerSuperBoot(disco, int64(inicio))
+
+	dotSalida = "digraph AVD{\n"
+	dotSalida += "graph[overlap = \"false\", splines = \"true\"]\n"
+	recorrerAVD(disco, int64(sb.InicioAVD), int64(sb.InicioAVD), 0)
+	dotSalida += "}"
+
+	pathSinComillas := strings.ReplaceAll(path, "\"", "")
+	aux := strings.Split(pathSinComillas, ".")
+	pathDot := aux[0] + ".dot"
+	pathImagen := aux[0] + ".png"
+	archivoSalida, _ := os.Create(pathDot)
+	archivoSalida.WriteString(dotSalida)
+	archivoSalida.Close()
+
+	exec.Command("dot", pathDot, "-Tpng", "-o", pathImagen).Output()
+}
+
+func recorrerBloques(disco *os.File, posicionActualBLoque, bitActual int64) {
+	disco.Seek(posicionActualBLoque, 0)
+
+	bloqueAux := bloqueDatos{}
+
+	contenido := make([]byte, int(unsafe.Sizeof(bloqueAux)))
+	_, err := disco.Read(contenido)
+	if err != nil {
+	}
+	buffer := bytes.NewBuffer(contenido)
+	a := binary.Read(buffer, binary.BigEndian, &bloqueAux)
+	if a != nil {
+	}
+
+	dotSalida += "Bloque" + strconv.Itoa(int(bitActual)) + " [shape=\"plaintext\" label= <<table>\n"
+	dotSalida += "<tr><td>" + retornarStringLimpio(bloqueAux.Contenido[:]) + "</td></tr>"
+	dotSalida += "</table>>]\n"
+}
+
+func recorrerINodo(disco *os.File, posicionActualINodo, bitActual int64) {
+	disco.Seek(posicionActualINodo, 0)
+
+	inodoAux := iNodo{}
+
+	contenido := make([]byte, int(unsafe.Sizeof(iNodo{})))
+	_, err := disco.Read(contenido)
+	if err != nil {
+	}
+	buffer := bytes.NewBuffer(contenido)
+	a := binary.Read(buffer, binary.BigEndian, &inodoAux)
+	if a != nil {
+	}
+
+	dotSalida += "INodo" + strconv.Itoa(int(bitActual)) + " [shape=\"plaintext\" label= <<table>\n"
+	dotSalida += "<tr><td>Inodo</td></tr>"
+	dotSalida += "<tr><td port=\"0\"></td></tr>\n"
+	dotSalida += "<tr><td port=\"1\"></td></tr>\n"
+	dotSalida += "<tr><td port=\"2\"></td></tr>\n"
+	dotSalida += "<tr><td port=\"3\"></td></tr>\n"
+	dotSalida += "<tr><td port=\"4\"></td></tr>\n"
+	dotSalida += "</table>>]\n"
+
+	for i := 0; i < 3; i++ {
+		if inodoAux.ApuntadroBloques[i] != -1 {
+			bitAux := (inodoAux.ApuntadroBloques[i] - int64(super.InicioBLoques)) / int64(unsafe.Sizeof(bloqueDatos{}))
+			dotSalida += "INodo" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(i) + " -> " + " Bloque" + strconv.Itoa(int(bitAux)) + "\n"
+			recorrerBloques(disco, inodoAux.ApuntadroBloques[i], bitAux)
+		}
+	}
+
+	if inodoAux.ApuntadorExtraINodo != -1 {
+		bitAux := (inodoAux.ApuntadorExtraINodo - int64(super.InicioINodo)) / int64(unsafe.Sizeof(iNodo{}))
+		dotSalida += "INodo" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(4) + " -> " + " INodo" + strconv.Itoa(int(bitAux)) + "\n"
+		recorrerINodo(disco, inodoAux.ApuntadorExtraINodo, bitAux)
+	}
+}
+
+func recorrerDD(disco *os.File, posicionActualDD, bitActual int64) {
+	disco.Seek(posicionActualDD, 0)
+
+	ddAux := detalleDirectorio{}
+	internoVacio := estructuraInterndaDD{}
+
+	contenido := make([]byte, int(unsafe.Sizeof(ddAux)))
+	_, err := disco.Read(contenido)
+	if err != nil {
+	}
+	buffer := bytes.NewBuffer(contenido)
+	a := binary.Read(buffer, binary.BigEndian, &ddAux)
+	if a != nil {
+	}
+
+	dotSalida += "DD" + strconv.Itoa(int(bitActual)) + " [shape=\"plaintext\" label= <<table>\n"
+	dotSalida += "<tr><td>Detalle de directorio</td></tr>"
+	for i := 0; i < 4; i++ {
+		if ddAux.ArregloArchivos[i] != internoVacio {
+			dotSalida += "<tr><td port=" + "\"" + strconv.Itoa(i) + "\">" + retornarStringLimpio(ddAux.ArregloArchivos[i].NombreArchivo[:]) + "</td></tr>\n"
+		} else {
+			dotSalida += "<tr><td port=" + "\"" + strconv.Itoa(i) + "\">Sin archivo</td></tr>\n"
+		}
+	}
+	dotSalida += "<tr><td port=\"5\"></td></tr>\n"
+	dotSalida += "</table>>]\n"
+
+	for i := 0; i < 4; i++ {
+		if ddAux.ArregloArchivos[i] != internoVacio {
+			bitAux := (ddAux.ArregloArchivos[i].ApuntadorINodo - int64(super.InicioINodo)) / int64(unsafe.Sizeof(iNodo{}))
+			dotSalida += "DD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(i) + " -> " + " INodo" + strconv.Itoa(int(bitAux)) + "\n"
+			recorrerINodo(disco, ddAux.ArregloArchivos[i].ApuntadorINodo, bitAux)
+		}
+	}
+
+	if ddAux.ApuntadorExtraDD != -1 {
+		bitAux := (ddAux.ApuntadorExtraDD - int64(super.InicioDD)) / int64(unsafe.Sizeof(detalleDirectorio{}))
+		dotSalida += "DD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(5) + " -> " + " DD" + strconv.Itoa(int(bitAux)) + "\n"
+		recorrerDD(disco, ddAux.ApuntadorExtraDD, bitAux)
+	}
+}
+
+func recorrerAVD(disco *os.File, inicioAvd, posicionActualAVD, bitActual int64) {
+	disco.Seek(posicionActualAVD, 0)
+
+	avdAux := avd{}
+	contenido := make([]byte, int(unsafe.Sizeof(avdAux)))
+	_, err := disco.Read(contenido)
+	if err != nil {
+	}
+	buffer := bytes.NewBuffer(contenido)
+	a := binary.Read(buffer, binary.BigEndian, &avdAux)
+	if a != nil {
+	}
+
+	dotSalida += "AVD" + strconv.Itoa(int(bitActual)) + " [shape=\"plaintext\" label= <<table>\n"
+	dotSalida += "<tr><td colspan=\"8\">" + retornarStringLimpio(avdAux.Nombre[:]) + "</td></tr>"
+
+	dotSalida += "<tr>\n"
+	dotSalida += "<td port=\"0\"></td>\n"
+	dotSalida += "<td port=\"1\"></td>\n"
+	dotSalida += "<td port=\"2\"></td>\n"
+	dotSalida += "<td port=\"3\"></td>\n"
+	dotSalida += "<td port=\"4\"></td>\n"
+	dotSalida += "<td port=\"5\"></td>\n"
+	dotSalida += "<td port=\"6\"></td>\n"
+	dotSalida += "<td port=\"7\"></td>\n"
+	dotSalida += "</tr>\n"
+	dotSalida += "</table>>]\n"
+
+	for i := 0; i < 6; i++ {
+		if avdAux.SubDirectorios[i] != -1 {
+			bitAux := (avdAux.SubDirectorios[i] - inicioAvd) / int64(unsafe.Sizeof(avd{}))
+			dotSalida += "AVD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(i) + " -> " + " AVD" + strconv.Itoa(int(bitAux)) + "\n"
+			recorrerAVD(disco, inicioAvd, avdAux.SubDirectorios[i], bitAux)
+		}
+	}
+
+	fmt.Println("name", string(avdAux.Nombre[:]), "apuntador del dd ", avdAux.ApuntadorDD)
+	if avdAux.ApuntadorDD != -1 {
+		bitAux := (avdAux.ApuntadorDD - int64(super.InicioDD)) / int64(unsafe.Sizeof(detalleDirectorio{}))
+		dotSalida += "AVD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(6) + " -> " + " DD" + strconv.Itoa(int(bitAux)) + "\n"
+		recorrerDD(disco, avdAux.ApuntadorDD, bitAux)
+	}
+
+	if avdAux.ApuntadoExtraAVD != -1 {
+		bitAux := (avdAux.ApuntadoExtraAVD - inicioAvd) / int64(unsafe.Sizeof(avd{}))
+		dotSalida += "AVD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(7) + " -> " + " AVD" + strconv.Itoa(int(bitAux)) + "\n"
+		recorrerAVD(disco, inicioAvd, avdAux.ApuntadoExtraAVD, bitAux)
 	}
 }
 
@@ -67,6 +238,7 @@ func reporteMBR(id, path string) {
 		}
 	}
 
+	disco.Close()
 	dot += "</table>> ]\n }"
 	pathSinComillas := strings.ReplaceAll(path, "\"", "")
 	aux := strings.Split(pathSinComillas, ".")
@@ -110,6 +282,7 @@ func reporteDisk(id, path string) {
 
 	dot += "</tr>\n</table>>]\n}"
 
+	disco.Close()
 	pathSinComillas := strings.ReplaceAll(path, "\"", "")
 	aux := strings.Split(pathSinComillas, ".")
 	pathDot := aux[0] + ".dot"
@@ -161,6 +334,7 @@ func reporteSb(id, path string) {
 	dot += "<tr><td> No. Carnet </td><td> " + strconv.Itoa(int(sb.Carnet)) + "</td></tr>\n"
 	dot += "</table>> ]\n }"
 
+	disco.Close()
 	pathSinComillas := strings.ReplaceAll(path, "\"", "")
 	aux := strings.Split(pathSinComillas, ".")
 	pathDot := aux[0] + ".dot"
@@ -205,6 +379,7 @@ func reporteBMAVD(id, path string) {
 		contador++
 	}
 
+	disco.Close()
 	pathSinComillas := strings.ReplaceAll(path, "\"", "")
 	archivoSalida, _ := os.Create(pathSinComillas)
 	archivoSalida.WriteString(salida)
@@ -244,6 +419,7 @@ func reporteBMDD(id, path string) {
 		contador++
 	}
 
+	disco.Close()
 	pathSinComillas := strings.ReplaceAll(path, "\"", "")
 	archivoSalida, _ := os.Create(pathSinComillas)
 	archivoSalida.WriteString(salida)
@@ -283,6 +459,7 @@ func reporteBMINodos(id, path string) {
 		contador++
 	}
 
+	disco.Close()
 	pathSinComillas := strings.ReplaceAll(path, "\"", "")
 	archivoSalida, _ := os.Create(pathSinComillas)
 	archivoSalida.WriteString(salida)
@@ -322,6 +499,7 @@ func reporteBMBloques(id, path string) {
 		contador++
 	}
 
+	disco.Close()
 	pathSinComillas := strings.ReplaceAll(path, "\"", "")
 	archivoSalida, _ := os.Create(pathSinComillas)
 	archivoSalida.WriteString(salida)
@@ -337,6 +515,7 @@ func reporteDirectorio(id, path string) {
 	recorridoIndividualAVD(disco, int64(sb.InicioAVD), int64(sb.InicioAVD), 0)
 	dotSalida += "}"
 
+	disco.Close()
 	pathSinComillas := strings.ReplaceAll(path, "\"", "")
 	aux := strings.Split(pathSinComillas, ".")
 	pathDot := aux[0] + ".dot"
