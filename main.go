@@ -25,6 +25,5 @@ func main() {
 		}
 		comando = strings.ReplaceAll(comando, "\n", "")
 		analizarComandoPrincipal(strings.Split(comando, " "))
-		//calcularNoEstructras(1073741824)
 	}
 }

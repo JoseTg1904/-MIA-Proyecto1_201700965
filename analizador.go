@@ -86,7 +86,7 @@ func analizarParametrosMkfile(entrada []string) {
 					return
 				}
 			case "-cont":
-				cont = aux[1]
+				cont = obtenerPath(entrada, i)
 			}
 		} else {
 			break
@@ -284,7 +284,7 @@ func analizarParametrosMount(entrada []string) {
 			case "-path":
 				path = obtenerPath(entrada, i)
 			case "-name":
-				name = aux[1]
+				name = obtenerPath(entrada, i)
 			}
 		} else {
 			break
@@ -333,7 +333,7 @@ func analizarParametrosFdisk(entrada []string) {
 					delete = val
 				}
 			case "-name":
-				name = aux[1]
+				name = obtenerPath(entrada, i)
 			case "-add":
 				add, _ = strconv.Atoi(aux[1])
 			}
@@ -418,11 +418,15 @@ func analizarParametrosMkdisk(entrada []string) {
 
 func obtenerPath(entrada []string, posicion int) string {
 	path1 := strings.Split(entrada[posicion], "->")
-	if string(path1[1][0]) == "\"" {
-		path := path1[1] + entrada[posicion+1]
-		path = strings.ReplaceAll(path, "\"", "")
-		path = strings.ReplaceAll(path, "\n", "")
-		return path
+	if val := path1[1]; string(val[0]) == "\"" && string(val[len(val)-1]) == "\"" {
+		val = strings.ReplaceAll(val, "\"", "")
+		val = strings.ReplaceAll(val, "\n", "")
+		return val
+	} else if val := path1[1]; string(val[0]) == "\"" {
+		val += " " + entrada[posicion+1]
+		val = strings.ReplaceAll(val, "\"", "")
+		val = strings.ReplaceAll(val, "\n", "")
+		return val
 	}
 	path1[1] = strings.ReplaceAll(path1[1], "\n", "")
 	return path1[1]
