@@ -14,6 +14,17 @@ var super = superBoot{}
 var existenciaAVD = false
 var posicionActualAVD = int64(0)
 
+var existenciaArchivo = false
+var posicionActualDD = int64(0)
+
+var posicionActualInodo = int64(0)
+
+var contenidoArchivo = ""
+var grupoActual = ""
+var usuarioActual = ""
+var contraActual = ""
+var loggeado = false
+
 type superBoot struct {
 	Nombre              [20]byte
 	NoAVD               uint32
@@ -213,6 +224,7 @@ func formateoSistema(id, tipo string) {
 
 	posAux := int64(super.InicioLog)
 	buffer.Reset()
+
 	bitacoraAux := bitacora{}
 	bitacoraAux.Tamanio = -1
 	binary.Write(buffer, binary.BigEndian, &bitacoraAux)
@@ -422,6 +434,13 @@ func crearAVD(id, especial, ruta string) {
 		return
 	}
 
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		fmt.Println("La particion presento una perdida")
+		return
+	}
+
 	super = obtenerSuperBoot(disco, int64(inicio))
 
 	posicionActualAVD = int64(super.InicioAVD)
@@ -611,6 +630,13 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 
 	if disco == nil {
 		fmt.Println("El disco aun no se encuentra montado")
+		return
+	}
+
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		fmt.Println("La particion presento una perdida")
 		return
 	}
 
@@ -1225,4 +1251,187 @@ func agregarLog(disco *os.File, operacion, tipo, path, contenido string, size in
 	bufferEscritura := bytes.NewBuffer([]byte{})
 	binary.Write(bufferEscritura, binary.BigEndian, &bitacoraAux)
 	disco.Write(bufferEscritura.Bytes())
+}
+
+func busquedaArchivoDD(disco *os.File, posicionActualDD int64, nombre string) {
+	ddAux := detalleDirectorio{}
+	internoVacio := estructuraInterndaDD{}
+
+	contenido := make([]byte, int(unsafe.Sizeof(ddAux)))
+	disco.Seek(posicionActualDD, 0)
+	_, err := disco.Read(contenido)
+	if err != nil {
+		fmt.Println("Error en la lectura del disco")
+	}
+	buffer := bytes.NewBuffer(contenido)
+	a := binary.Read(buffer, binary.BigEndian, &ddAux)
+	if a != nil {
+	}
+
+	name := [20]byte{}
+	copy(name[:], nombre)
+
+	for i := 0; i < 5; i++ {
+		if ddAux.ArregloArchivos[i] != internoVacio {
+			if ddAux.ArregloArchivos[i].NombreArchivo == name {
+				existenciaArchivo = true
+				posicionActualInodo = ddAux.ArregloArchivos[i].ApuntadorINodo
+				break
+			}
+		}
+	}
+
+	if existenciaArchivo == false {
+		if ddAux.ApuntadorExtraDD != -1 {
+			busquedaArchivoDD(disco, ddAux.ApuntadorExtraDD, nombre)
+		}
+	}
+}
+
+func busquedaArchivoBloques(disco *os.File, posicionActualBloque int64) {
+	bloqueAux := bloqueDatos{}
+
+	contenido := make([]byte, int(unsafe.Sizeof(bloqueAux)))
+	disco.Seek(posicionActualBloque, 0)
+	_, err := disco.Read(contenido)
+	if err != nil {
+		fmt.Println("Error en la lectura del disco")
+	}
+	buffer := bytes.NewBuffer(contenido)
+	a := binary.Read(buffer, binary.BigEndian, &bloqueAux)
+	if a != nil {
+	}
+
+	contenidoArchivo += retornarStringLimpio(bloqueAux.Contenido[:])
+}
+
+func busquedaArchivoInodo(disco *os.File, posicionActualInodo int64) {
+	inodoAux := iNodo{}
+
+	contenido := make([]byte, int(unsafe.Sizeof(inodoAux)))
+	disco.Seek(posicionActualInodo, 0)
+	_, err := disco.Read(contenido)
+	if err != nil {
+		fmt.Println("Error en la lectura del disco")
+	}
+	buffer := bytes.NewBuffer(contenido)
+	a := binary.Read(buffer, binary.BigEndian, &inodoAux)
+	if a != nil {
+	}
+
+	for i := 0; i < 4; i++ {
+		if inodoAux.ApuntadroBloques[i] != -1 {
+			busquedaArchivoBloques(disco, inodoAux.ApuntadroBloques[i])
+		}
+	}
+
+	if inodoAux.ApuntadorExtraINodo != -1 {
+		busquedaArchivoInodo(disco, inodoAux.ApuntadorExtraINodo)
+	}
+}
+
+func obtenerContenidoArchivo(disco *os.File, path string) string {
+
+	contenidoArchivo = ""
+
+	posicionActualAVD = int64(super.InicioAVD)
+
+	listado := strings.Split(path, "/")
+	for i := 1; i < len(listado)-1; i++ {
+		verificarExistenciaAVD(disco, posicionActualAVD, listado[i])
+		if existenciaAVD == false {
+			fmt.Println("Alguna de las carpetas padres a las cual desea acceder no existe")
+			return ""
+		}
+	}
+
+	avdAux := avd{}
+	contenido := make([]byte, int(unsafe.Sizeof(avdAux)))
+	disco.Seek(posicionActualAVD, 0)
+	_, err := disco.Read(contenido)
+	if err != nil {
+		fmt.Println("Error en la lectura del disco")
+	}
+	buffer := bytes.NewBuffer(contenido)
+	a := binary.Read(buffer, binary.BigEndian, &avdAux)
+	if a != nil {
+	}
+
+	if avdAux.ApuntadorDD == -1 {
+		fmt.Println("La carpeta no tiene ningun archivo asociado")
+		return ""
+	}
+
+	busquedaArchivoDD(disco, avdAux.ApuntadorDD, listado[len(listado)-1])
+
+	if posicionActualInodo == 0 {
+		fmt.Println("El archivo no existe en la carpeta")
+		return ""
+	}
+
+	busquedaArchivoInodo(disco, posicionActualInodo)
+
+	return contenidoArchivo
+}
+
+func cerrarSesion() {
+	if loggeado == false {
+		fmt.Println("Debe de iniciar sesion para poder cerrarla")
+		return
+	}
+
+	loggeado = false
+	usuarioActual = ""
+	grupoActual = ""
+	contraActual = ""
+	fmt.Println("Se a cerrado la sesion exitosamente")
+}
+
+func iniciarSesion(id, usr, pwd string) {
+	disco, _, inicio := obtenerDiscoMontado(id)
+
+	if disco == nil {
+		fmt.Println("El disco no se encuentra montado")
+		return
+	}
+
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		fmt.Println("La particion presento una perdida")
+		return
+	}
+
+	if loggeado == true {
+		fmt.Println("Ya existe una sesion iniciada en el sistema")
+		return
+	}
+
+	super = obtenerSuperBoot(disco, int64(inicio))
+
+	lineas := strings.Split(obtenerContenidoArchivo(disco, "/users.txt"), "\n")
+
+	banderaEncontado := false
+
+	for i := 0; i < len(lineas)-1; i++ {
+		linea := strings.Split(lineas[i], ",")
+		if val := strings.Trim(linea[0], " "); val != "0" {
+			if strings.Trim(linea[1], " ") == "U" {
+				if strings.Trim(linea[3], " ") == usr && strings.Trim(linea[4], " ") == pwd {
+					usuarioActual = usr
+					contraActual = pwd
+					grupoActual = strings.Trim(linea[2], " ")
+					banderaEncontado = true
+					loggeado = true
+				}
+			}
+		}
+	}
+
+	if banderaEncontado {
+		fmt.Println("A inicio sesion exitosamente")
+	} else {
+		fmt.Println("Sus credenciales no se han econtrado en el sistema")
+	}
+
 }

@@ -30,7 +30,9 @@ func analizarComandoPrincipal(entrada []string) {
 		case "mkfs":
 			analizarParametrosMkfs(entrada)
 		case "login":
+			analizarParametrosLogin(entrada)
 		case "logout":
+			cerrarSesion()
 		case "mkgrp":
 		case "rmgrp":
 		case "mkusr":
@@ -211,25 +213,30 @@ func analizarParametrosMkgrp(entrada []string) {
 }
 
 func analizarParametrosLogin(entrada []string) {
+	id := "vacio"
 	usr := "vacio"
 	pwd := "vacio"
-	id := "vacio"
 
 	for i := 1; i < len(entrada); i++ {
 		aux := strings.Split(entrada[i], "->")
-		switch aux[0] {
-		case "-id":
-			id = aux[1]
-		case "-usr":
-			usr = aux[1]
-		case "-pwd":
-			pwd = aux[1]
+		if strings.Contains(aux[0], "#") == false {
+			switch strings.ToLower(aux[0]) {
+			case "-id":
+				id = strings.ToLower(aux[1])
+			case "-usr":
+				usr = obtenerPath(entrada, i)
+			case "-pwd":
+				pwd = obtenerPath(entrada, i)
+			}
+		} else {
+			break
 		}
 	}
-	if usr != "vacio" && pwd != "vacio" && id != "vacio" {
-		//ir al metodo para el mkdisk
+
+	if id != "vacio" && pwd != "vacio" && usr != "vacio" {
+		iniciarSesion(id, usr, pwd)
 	} else {
-		fmt.Println("El comando ingresado no es valido")
+		fmt.Print("\nEl comando ingresado no es valido\n\n")
 	}
 }
 
