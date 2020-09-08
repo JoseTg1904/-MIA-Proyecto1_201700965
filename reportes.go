@@ -54,6 +54,8 @@ func reporteBitacora(id, path string) {
 	dotSalida = "digraph AVD{\n"
 	dotSalida += "rankdir=LR\n"
 
+	pila := make([]string, 0)
+
 	bitAux := int64(0)
 	posicionActual := int64(super.InicioLog)
 
@@ -79,29 +81,34 @@ func reporteBitacora(id, path string) {
 			a := binary.Read(bufferBitacora, binary.BigEndian, &bitacoraAux)
 			if a != nil {
 			}
-			dotSalida += strconv.Itoa(int(bitAux)) + " [shape=\"plaintext\" label= <<table>\n"
-			dotSalida += "<tr><td>Tipo de operacion</td><td>Elemento insertado</td><td>Path</td><td>Contenido</td><td>Fecha</td><td>Tamaño</td></tr>\n"
-			dotSalida += "<tr>\n"
-			dotSalida += "<td>" + retornarStringLimpio(bitacoraAux.TipoOperacion[:]) + "</td>\n"
+			dotAux := strconv.Itoa(int(bitAux)) + " [shape=\"plaintext\" label= <<table>\n"
+			dotAux += "<tr><td>Tipo de operacion</td><td>Elemento insertado</td><td>Path</td><td>Contenido</td><td>Fecha</td><td>Tamaño</td></tr>\n"
+			dotAux += "<tr>\n"
+			dotAux += "<td>" + retornarStringLimpio(bitacoraAux.TipoOperacion[:]) + "</td>\n"
+
 			var validador byte
 			validador = "1"[0]
 			if bitacoraAux.Tipo == validador {
-				dotSalida += "<td>Directorio</td>\n"
+				dotAux += "<td>Directorio</td>\n"
 			} else {
-				dotSalida += "<td>Archivo</td>\n"
+				dotAux += "<td>Archivo</td>\n"
 			}
-			dotSalida += "<td>" + retornarStringLimpio(bitacoraAux.Path[:]) + "</td>\n"
-			dotSalida += "<td>" + retornarStringLimpio(bitacoraAux.Contenido[:]) + "</td>\n"
-			dotSalida += "<td>" + retornarStringLimpio(bitacoraAux.Fecha[:]) + "</td>\n"
-			dotSalida += "<td>" + strconv.Itoa(int(bitacoraAux.Tamanio)) + "</td>\n"
-			dotSalida += "</tr>\n"
-			dotSalida += "</table>>]\n"
+			dotAux += "<td>" + retornarStringLimpio(bitacoraAux.Path[:]) + "</td>\n"
+			dotAux += "<td>" + retornarStringLimpio(bitacoraAux.Contenido[:]) + "</td>\n"
+			dotAux += "<td>" + retornarStringLimpio(bitacoraAux.Fecha[:]) + "</td>\n"
+			dotAux += "<td>" + strconv.Itoa(int(bitacoraAux.Tamanio)) + "</td>\n"
+			dotAux += "</tr>\n"
+			dotAux += "</table>>]\n"
+			pila = append(pila, dotAux)
 			bitAux++
 			posicionActual += int64(unsafe.Sizeof(bitacora{}))
 		} else {
 			break
 		}
 
+	}
+	for i := len(pila) - 1; i >= 0; i-- {
+		dotSalida += pila[i]
 	}
 
 	dotSalida += "}"
