@@ -54,6 +54,8 @@ type avd struct {
 	ApuntadorDD      int64
 	ApuntadoExtraAVD int64
 	Propietario      [20]byte
+	IDGrupo          [20]byte
+	Permisos         [20]byte
 }
 
 type detalleDirectorio struct {
@@ -75,6 +77,8 @@ type iNodo struct {
 	ApuntadroBloques         [4]int64
 	ApuntadorExtraINodo      int64
 	Propietario              [20]byte
+	IDGrupo                  [20]byte
+	Permiso                  [20]byte
 }
 
 type bloqueDatos struct {
@@ -82,11 +86,12 @@ type bloqueDatos struct {
 }
 
 type bitacora struct {
-	TipoOperacion [20]byte
+	TipoOperacion [10]byte
 	Tipo          byte
-	Nombre        [20]byte
-	Contenido     [25]byte
+	Path          [50]byte
+	Contenido     [50]byte
 	Fecha         [16]byte
+	Tamanio       int16
 }
 
 func calcularNoEstructras(tamanioParticion uint32) uint32 {
@@ -202,6 +207,17 @@ func formateoSistema(id, tipo string) {
 	binary.Write(buffer, binary.BigEndian, &avd)
 	disco.Write(buffer.Bytes())
 
+	posAux := int64(super.InicioLog)
+	buffer.Reset()
+	bitacoraAux := bitacora{}
+	bitacoraAux.Tamanio = -1
+	binary.Write(buffer, binary.BigEndian, &bitacoraAux)
+	for i := 0; i < int(noEstructuras); i++ {
+		disco.Seek(posAux, 0)
+		disco.Write(buffer.Bytes())
+		posAux += int64(unsafe.Sizeof(bitacora{}))
+	}
+
 	fmt.Println("Formateo de unidad completado con exito")
 	//escribir el usuario.txt
 	disco.Close()
@@ -292,6 +308,8 @@ func crearAVD(id, especial, ruta string) {
 
 	banderaSinCrear := false
 
+	iteradorLog := 0
+
 	if especial == "p" {
 		for i := 1; i < len(listado); i++ {
 			verificarExistenciaAVD(disco, posicionActualAVD, listado[i])
@@ -299,10 +317,14 @@ func crearAVD(id, especial, ruta string) {
 				if super.NoAVDLibres > 0 {
 					crearAVDIndividual(disco, int64(super.InicioBitMapAVD), int64(super.InicioAVD), posicionActualAVD, recorrerBitMapAVD(disco, super.InicioBitMapAVD, super.NoAVD), listado[i])
 					super.NoAVDLibres--
+					iteradorLog++
 				} else {
 					fmt.Println("a llegado a la capacidad maxima de creacion de carpetas")
 				}
 			}
+		}
+		if iteradorLog > 0 {
+			agregarLog(disco, "mkdir", "1", ruta, "", 1)
 		}
 		disco.Seek(int64(inicio), 0)
 		buffer := bytes.NewBuffer([]byte{})
@@ -329,6 +351,7 @@ func crearAVD(id, especial, ruta string) {
 		if banderaSinCrear {
 			fmt.Println("Una de las carpetas padre aun no se encuentra creada")
 		} else {
+			agregarLog(disco, "mkdir", "1", ruta, "", 1)
 			disco.Seek(int64(inicio), 0)
 			buffer := bytes.NewBuffer([]byte{})
 			binary.Write(buffer, binary.BigEndian, &super)
@@ -461,6 +484,8 @@ func recorrerBitMapAVD(disco *os.File, inicioBitMap, noAVD uint32) int64 {
 func crearArchivo(id, especial, ruta, cont string, size int64) {
 	disco, _, inicio := obtenerDiscoMontado(id)
 
+	contAux := cont
+
 	super = obtenerSuperBoot(disco, int64(inicio))
 
 	if size == -1 {
@@ -530,8 +555,6 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 		copy(interno.Creacion[:], obtenerFecha())
 		copy(interno.Modificacion[:], obtenerFecha())
 		copy(interno.NombreArchivo[:], rutaCarpeta[len(rutaCarpeta)-1])
-
-		fmt.Println(string(interno.NombreArchivo[:]))
 
 		noBloquesNecesarios := 1
 		iterador := 0
@@ -662,6 +685,8 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 		disco.Seek(int64(inicio), 0)
 		binary.Write(bufferEscritura, binary.BigEndian, &super)
 		disco.Write(bufferEscritura.Bytes())
+
+		agregarLog(disco, "mkfile", "0", ruta, contAux, size)
 
 		disco.Close()
 		fmt.Print("\nSe a creado el archivo exitosamente\n")
@@ -898,7 +923,11 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 		bufferEscritura.Reset()
 		binary.Write(bufferEscritura, binary.BigEndian, &super)
 		disco.Write(bufferEscritura.Bytes())
+
+		agregarLog(disco, "mkfile", "0", ruta, contAux, size)
+
 		disco.Close()
+
 		fmt.Print("\nSe a creado el archivo exitosamente\n")
 		return
 	}
@@ -1029,4 +1058,38 @@ func recorrerBitMapInodo(disco *os.File, inicioBitMap, noInodo uint32) int64 {
 	}
 
 	return int64(i)
+}
+
+func agregarLog(disco *os.File, operacion, tipo, path, contenido string, size int64) {
+	bitacoraAux := bitacora{Tamanio: int16(size),
+		Tipo: tipo[0]}
+	copy(bitacoraAux.TipoOperacion[:], operacion)
+	copy(bitacoraAux.Path[:], path)
+	copy(bitacoraAux.Contenido[:], contenido)
+	copy(bitacoraAux.Fecha[:], obtenerFecha())
+
+	posicionLog := int64(super.InicioLog)
+	for i := 0; i < int(super.NoAVD); i++ {
+		disco.Seek(posicionLog, 0)
+		logAux := bitacora{}
+		content := make([]byte, int(unsafe.Sizeof(bitacora{})))
+		_, err := disco.Read(content)
+		if err != nil {
+			fmt.Println("Error en la lectura del disco")
+		}
+		buffer := bytes.NewBuffer(content)
+		a := binary.Read(buffer, binary.BigEndian, &logAux)
+		if a != nil {
+		}
+		if logAux.Tamanio == -1 {
+			break
+		}
+		posicionLog += int64(unsafe.Sizeof(bitacora{}))
+	}
+
+	disco.Seek(posicionLog, 0)
+
+	bufferEscritura := bytes.NewBuffer([]byte{})
+	binary.Write(bufferEscritura, binary.BigEndian, &bitacoraAux)
+	disco.Write(bufferEscritura.Bytes())
 }

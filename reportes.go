@@ -12,6 +12,9 @@ import (
 )
 
 var dotSalida = ""
+var apuntadorBit = int64(0)
+var apuntadorEstructuraAVD = int64(-1)
+var apuntadorEstructuraDD = int64(-1)
 
 func desicionReporte(id, path, ruta, nombre string) {
 	switch nombre {
@@ -30,13 +33,365 @@ func desicionReporte(id, path, ruta, nombre string) {
 	case "bm_block":
 		reporteBMBloques(id, path)
 	case "bitacora":
+		reporteBitacora(id, path)
 	case "directorio":
 		reporteDirectorio(id, path)
 	case "tree_file":
+		reporteTreeFile(id, path, ruta)
 	case "tree_directorio":
+		reporteTreeDirectorio(id, path, ruta)
 	case "tree_complete":
 		reporteTreeComplete(id, path)
 	case "ls":
+	}
+}
+
+func reporteBitacora(id, path string) {
+	disco, _, inicio := obtenerDiscoMontado(id)
+
+	super = obtenerSuperBoot(disco, int64(inicio))
+
+	dotSalida = "digraph AVD{\n"
+	dotSalida += "rankdir=LR\n"
+
+	bitAux := int64(0)
+	posicionActual := int64(super.InicioLog)
+
+	for {
+		disco.Seek(posicionActual, 0)
+		bitacoraVacia := bitacora{}
+		contenido := make([]byte, int(unsafe.Sizeof(bitacora{})))
+		_, err := disco.Read(contenido)
+		if err != nil {
+		}
+		buffer := bytes.NewBuffer(contenido)
+		a := binary.Read(buffer, binary.BigEndian, &bitacoraVacia)
+		if a != nil {
+		}
+		if bitacoraVacia.Tamanio != -1 {
+			disco.Seek(posicionActual, 0)
+			bitacoraAux := bitacora{}
+			contenidoBitacora := make([]byte, int64(unsafe.Sizeof(bitacoraAux)))
+			_, err := disco.Read(contenidoBitacora)
+			if err != nil {
+			}
+			bufferBitacora := bytes.NewBuffer(contenidoBitacora)
+			a := binary.Read(bufferBitacora, binary.BigEndian, &bitacoraAux)
+			if a != nil {
+			}
+			dotSalida += strconv.Itoa(int(bitAux)) + " [shape=\"plaintext\" label= <<table>\n"
+			dotSalida += "<tr><td>Tipo de operacion</td><td>Elemento insertado</td><td>Path</td><td>Contenido</td><td>Fecha</td><td>Tamaño</td></tr>\n"
+			dotSalida += "<tr>\n"
+			dotSalida += "<td>" + retornarStringLimpio(bitacoraAux.TipoOperacion[:]) + "</td>\n"
+			var validador byte
+			validador = "1"[0]
+			if bitacoraAux.Tipo == validador {
+				dotSalida += "<td>Directorio</td>\n"
+			} else {
+				dotSalida += "<td>Archivo</td>\n"
+			}
+			dotSalida += "<td>" + retornarStringLimpio(bitacoraAux.Path[:]) + "</td>\n"
+			dotSalida += "<td>" + retornarStringLimpio(bitacoraAux.Contenido[:]) + "</td>\n"
+			dotSalida += "<td>" + retornarStringLimpio(bitacoraAux.Fecha[:]) + "</td>\n"
+			dotSalida += "<td>" + strconv.Itoa(int(bitacoraAux.Tamanio)) + "</td>\n"
+			dotSalida += "</tr>\n"
+			dotSalida += "</table>>]\n"
+			bitAux++
+			posicionActual += int64(unsafe.Sizeof(bitacora{}))
+		} else {
+			break
+		}
+
+	}
+
+	dotSalida += "}"
+
+	pathSinComillas := strings.ReplaceAll(path, "\"", "")
+	aux := strings.Split(pathSinComillas, ".")
+	pathDot := aux[0] + ".dot"
+	pathImagen := aux[0] + ".png"
+	archivoSalida, _ := os.Create(pathDot)
+	archivoSalida.WriteString(dotSalida)
+	archivoSalida.Close()
+
+	exec.Command("dot", pathDot, "-Tpng", "-o", pathImagen).Output()
+
+}
+
+func reporteTreeDirectorio(id, path, ruta string) {
+	disco, _, inicio := obtenerDiscoMontado(id)
+
+	super = obtenerSuperBoot(disco, int64(inicio))
+
+	dotSalida = "digraph AVD{\n"
+	dotSalida += "graph[overlap = \"false\", splines = \"true\"]\n"
+	apuntadorEstructuraAVD = int64(super.InicioAVD)
+	apuntadorBit = 0
+	apuntadorEstructuraDD = -1
+
+	division := strings.Split(ruta, "/")
+	for i := 0; i < len(division); i++ {
+		fmt.Println(i, "valor", division[i])
+		if i == len(division)-1 {
+			recorrerAVDDirectorio(disco, int64(super.InicioAVD), apuntadorEstructuraAVD, apuntadorBit, "", true)
+		} else {
+			recorrerAVDDirectorio(disco, int64(super.InicioAVD), apuntadorEstructuraAVD, apuntadorBit, division[i+1], false)
+		}
+	}
+	if apuntadorEstructuraDD != -1 {
+		recorrerDDFile(disco, apuntadorEstructuraDD, apuntadorBit)
+	}
+	dotSalida += "}"
+
+	pathSinComillas := strings.ReplaceAll(path, "\"", "")
+	aux := strings.Split(pathSinComillas, ".")
+	pathDot := aux[0] + ".dot"
+	pathImagen := aux[0] + ".png"
+	archivoSalida, _ := os.Create(pathDot)
+	archivoSalida.WriteString(dotSalida)
+	archivoSalida.Close()
+
+	exec.Command("dot", pathDot, "-Tpng", "-o", pathImagen).Output()
+}
+
+func reporteTreeFile(id, path, ruta string) {
+	disco, _, inicio := obtenerDiscoMontado(id)
+
+	super = obtenerSuperBoot(disco, int64(inicio))
+
+	dotSalida = "digraph AVD{\n"
+	dotSalida += "graph[overlap = \"false\", splines = \"true\"]\n"
+	apuntadorEstructuraAVD = int64(super.InicioAVD)
+	apuntadorBit = 0
+	apuntadorEstructuraDD = -1
+
+	division := strings.Split(ruta, "/")
+	for i := 0; i < len(division)-1; i++ {
+		if i == len(division)-2 {
+			recorrerAVDFile(disco, int64(super.InicioAVD), apuntadorEstructuraAVD, apuntadorBit, "", true)
+		} else {
+			recorrerAVDFile(disco, int64(super.InicioAVD), apuntadorEstructuraAVD, apuntadorBit, division[i+1], false)
+		}
+	}
+	if apuntadorEstructuraDD != -1 {
+		recorrerDDFiles(disco, apuntadorEstructuraDD, apuntadorBit, division[len(division)-1])
+	}
+	dotSalida += "}"
+
+	pathSinComillas := strings.ReplaceAll(path, "\"", "")
+	aux := strings.Split(pathSinComillas, ".")
+	pathDot := aux[0] + ".dot"
+	pathImagen := aux[0] + ".png"
+	archivoSalida, _ := os.Create(pathDot)
+	archivoSalida.WriteString(dotSalida)
+	archivoSalida.Close()
+
+	exec.Command("dot", pathDot, "-Tpng", "-o", pathImagen).Output()
+}
+
+func recorrerAVDFile(disco *os.File, inicioAvd, posicionActualAVD, bitActual int64, carpetaHijo string, ultimo bool) {
+	disco.Seek(posicionActualAVD, 0)
+
+	avdAux := avd{}
+	contenido := make([]byte, int(unsafe.Sizeof(avdAux)))
+	_, err := disco.Read(contenido)
+	if err != nil {
+	}
+	buffer := bytes.NewBuffer(contenido)
+	a := binary.Read(buffer, binary.BigEndian, &avdAux)
+	if a != nil {
+	}
+
+	dotSalida += "AVD" + strconv.Itoa(int(bitActual)) + " [shape=\"plaintext\" label= <<table>\n"
+	dotSalida += "<tr><td colspan=\"8\">" + retornarStringLimpio(avdAux.Nombre[:]) + "</td></tr>"
+	dotSalida += "<tr>\n"
+	dotSalida += "<td port=\"0\"></td>\n"
+	dotSalida += "<td port=\"1\"></td>\n"
+	dotSalida += "<td port=\"2\"></td>\n"
+	dotSalida += "<td port=\"3\"></td>\n"
+	dotSalida += "<td port=\"4\"></td>\n"
+	dotSalida += "<td port=\"5\"></td>\n"
+	dotSalida += "<td port=\"6\"></td>\n"
+	dotSalida += "<td port=\"7\"></td>\n"
+	dotSalida += "</tr>\n"
+	dotSalida += "</table>>]\n"
+
+	for i := 0; i < 6; i++ {
+		if avdAux.SubDirectorios[i] != -1 {
+			avdInerno := avd{}
+			disco.Seek(avdAux.SubDirectorios[i], 0)
+			content := make([]byte, int(unsafe.Sizeof(avdInerno)))
+			_, err := disco.Read(content)
+			if err != nil {
+			}
+			bufferInterno := bytes.NewBuffer(content)
+			a := binary.Read(bufferInterno, binary.BigEndian, &avdInerno)
+			if a != nil {
+			}
+			name := [20]byte{}
+			copy(name[:], carpetaHijo)
+			if carpetaHijo != "" {
+				if avdInerno.Nombre == name {
+					apuntadorBit = (avdAux.SubDirectorios[i] - inicioAvd) / int64(unsafe.Sizeof(avd{}))
+					dotSalida += "AVD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(i) + " -> " + " AVD" + strconv.Itoa(int(apuntadorBit)) + "\n"
+					apuntadorEstructuraAVD = avdAux.SubDirectorios[i]
+					break
+				}
+			}
+		}
+	}
+	if ultimo == true {
+		if avdAux.ApuntadorDD != -1 {
+			apuntadorEstructuraDD = avdAux.ApuntadorDD
+			apuntadorBit = (avdAux.ApuntadorDD - int64(super.InicioDD)) / int64(unsafe.Sizeof(detalleDirectorio{}))
+			dotSalida += "AVD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(6) + " -> " + " DD" + strconv.Itoa(int(apuntadorBit)) + "\n"
+		}
+	}
+}
+
+func recorrerDDFiles(disco *os.File, posicionActualDD, bitActual int64, archivo string) {
+	disco.Seek(posicionActualDD, 0)
+
+	ddAux := detalleDirectorio{}
+	internoVacio := estructuraInterndaDD{}
+
+	contenido := make([]byte, int(unsafe.Sizeof(ddAux)))
+	_, err := disco.Read(contenido)
+	if err != nil {
+	}
+	buffer := bytes.NewBuffer(contenido)
+	a := binary.Read(buffer, binary.BigEndian, &ddAux)
+	if a != nil {
+	}
+
+	banderaEncontrado := false
+
+	dotSalida += "DD" + strconv.Itoa(int(bitActual)) + " [shape=\"plaintext\" label= <<table>\n"
+	dotSalida += "<tr><td>Detalle de directorio</td></tr>"
+	for i := 0; i < 5; i++ {
+		if ddAux.ArregloArchivos[i] != internoVacio {
+			dotSalida += "<tr><td port=" + "\"" + strconv.Itoa(i) + "\">" + retornarStringLimpio(ddAux.ArregloArchivos[i].NombreArchivo[:]) + "</td></tr>\n"
+		} else {
+			dotSalida += "<tr><td port=" + "\"" + strconv.Itoa(i) + "\">Sin archivo</td></tr>\n"
+		}
+	}
+	dotSalida += "<tr><td port=\"5\"></td></tr>\n"
+	dotSalida += "</table>>]\n"
+
+	for i := 0; i < 5; i++ {
+		if ddAux.ArregloArchivos[i] != internoVacio {
+			name := [20]byte{}
+			copy(name[:], archivo)
+			if ddAux.ArregloArchivos[i].NombreArchivo == name {
+				apuntadorBit = (ddAux.ArregloArchivos[i].ApuntadorINodo - int64(super.InicioINodo)) / int64(unsafe.Sizeof(iNodo{}))
+				dotSalida += "DD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(5) + " -> " + " INodo" + strconv.Itoa(int(apuntadorBit)) + "\n"
+				recorrerINodo(disco, ddAux.ArregloArchivos[i].ApuntadorINodo, apuntadorBit)
+				banderaEncontrado = true
+				break
+			}
+		}
+	}
+
+	if banderaEncontrado == false {
+		if ddAux.ApuntadorExtraDD != -1 {
+			bitAux := (ddAux.ApuntadorExtraDD - int64(super.InicioDD)) / int64(unsafe.Sizeof(detalleDirectorio{}))
+			dotSalida += "DD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(5) + " -> " + " DD" + strconv.Itoa(int(bitAux)) + "\n"
+			recorrerDDFiles(disco, posicionActualDD, bitActual, archivo)
+		}
+	}
+}
+
+func recorrerDDFile(disco *os.File, posicionActualDD, bitActual int64) {
+	disco.Seek(posicionActualDD, 0)
+
+	ddAux := detalleDirectorio{}
+	internoVacio := estructuraInterndaDD{}
+
+	contenido := make([]byte, int(unsafe.Sizeof(ddAux)))
+	_, err := disco.Read(contenido)
+	if err != nil {
+	}
+	buffer := bytes.NewBuffer(contenido)
+	a := binary.Read(buffer, binary.BigEndian, &ddAux)
+	if a != nil {
+	}
+
+	dotSalida += "DD" + strconv.Itoa(int(bitActual)) + " [shape=\"plaintext\" label= <<table>\n"
+	dotSalida += "<tr><td>Detalle de directorio</td></tr>"
+	for i := 0; i < 5; i++ {
+		if ddAux.ArregloArchivos[i] != internoVacio {
+			dotSalida += "<tr><td port=" + "\"" + strconv.Itoa(i) + "\">" + retornarStringLimpio(ddAux.ArregloArchivos[i].NombreArchivo[:]) + "</td></tr>\n"
+		} else {
+			dotSalida += "<tr><td port=" + "\"" + strconv.Itoa(i) + "\">Sin archivo</td></tr>\n"
+		}
+	}
+	dotSalida += "<tr><td port=\"5\"></td></tr>\n"
+	dotSalida += "</table>>]\n"
+
+	if ddAux.ApuntadorExtraDD != -1 {
+		bitAux := (ddAux.ApuntadorExtraDD - int64(super.InicioDD)) / int64(unsafe.Sizeof(detalleDirectorio{}))
+		dotSalida += "DD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(5) + " -> " + " DD" + strconv.Itoa(int(bitAux)) + "\n"
+		recorrerDDFile(disco, ddAux.ApuntadorExtraDD, bitAux)
+	}
+}
+
+func recorrerAVDDirectorio(disco *os.File, inicioAvd, posicionActualAVD, bitActual int64, carpetaHijo string, ultimo bool) {
+	disco.Seek(posicionActualAVD, 0)
+
+	avdAux := avd{}
+	contenido := make([]byte, int(unsafe.Sizeof(avdAux)))
+	_, err := disco.Read(contenido)
+	if err != nil {
+	}
+	buffer := bytes.NewBuffer(contenido)
+	a := binary.Read(buffer, binary.BigEndian, &avdAux)
+	if a != nil {
+	}
+
+	dotSalida += "AVD" + strconv.Itoa(int(bitActual)) + " [shape=\"plaintext\" label= <<table>\n"
+	dotSalida += "<tr><td colspan=\"8\">" + retornarStringLimpio(avdAux.Nombre[:]) + "</td></tr>"
+	dotSalida += "<tr>\n"
+	dotSalida += "<td port=\"0\"></td>\n"
+	dotSalida += "<td port=\"1\"></td>\n"
+	dotSalida += "<td port=\"2\"></td>\n"
+	dotSalida += "<td port=\"3\"></td>\n"
+	dotSalida += "<td port=\"4\"></td>\n"
+	dotSalida += "<td port=\"5\"></td>\n"
+	dotSalida += "<td port=\"6\"></td>\n"
+	dotSalida += "<td port=\"7\"></td>\n"
+	dotSalida += "</tr>\n"
+	dotSalida += "</table>>]\n"
+
+	for i := 0; i < 6; i++ {
+		if avdAux.SubDirectorios[i] != -1 {
+			avdInerno := avd{}
+			disco.Seek(avdAux.SubDirectorios[i], 0)
+			content := make([]byte, int(unsafe.Sizeof(avdInerno)))
+			_, err := disco.Read(content)
+			if err != nil {
+			}
+			bufferInterno := bytes.NewBuffer(content)
+			a := binary.Read(bufferInterno, binary.BigEndian, &avdInerno)
+			if a != nil {
+			}
+			name := [20]byte{}
+			copy(name[:], carpetaHijo)
+			if carpetaHijo != "" {
+				if avdInerno.Nombre == name {
+					apuntadorBit = (avdAux.SubDirectorios[i] - inicioAvd) / int64(unsafe.Sizeof(avd{}))
+					dotSalida += "AVD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(i) + " -> " + " AVD" + strconv.Itoa(int(apuntadorBit)) + "\n"
+					apuntadorEstructuraAVD = avdAux.SubDirectorios[i]
+					break
+				}
+			}
+		}
+	}
+	if ultimo == true {
+		if avdAux.ApuntadorDD != -1 {
+			apuntadorEstructuraDD = avdAux.ApuntadorDD
+			apuntadorBit = (avdAux.ApuntadorDD - int64(super.InicioDD)) / int64(unsafe.Sizeof(detalleDirectorio{}))
+			dotSalida += "AVD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(6) + " -> " + " DD" + strconv.Itoa(int(apuntadorBit)) + "\n"
+		}
 	}
 }
 
@@ -102,7 +457,7 @@ func recorrerINodo(disco *os.File, posicionActualINodo, bitActual int64) {
 	dotSalida += "<tr><td port=\"3\"></td></tr>\n"
 	dotSalida += "<tr><td port=\"4\"></td></tr>\n"
 	dotSalida += "</table>>]\n"
-	fmt.Println("actual", posicionActualINodo, " extra", inodoAux.ApuntadorExtraINodo)
+
 	for i := 0; i < 4; i++ {
 		if inodoAux.ApuntadroBloques[i] != -1 {
 			bitAux := (inodoAux.ApuntadroBloques[i] - int64(super.InicioBLoques)) / int64(unsafe.Sizeof(bloqueDatos{}))
@@ -196,7 +551,6 @@ func recorrerAVD(disco *os.File, inicioAvd, posicionActualAVD, bitActual int64) 
 		}
 	}
 
-	fmt.Println("name", string(avdAux.Nombre[:]), "apuntador del dd ", avdAux.ApuntadorDD)
 	if avdAux.ApuntadorDD != -1 {
 		bitAux := (avdAux.ApuntadorDD - int64(super.InicioDD)) / int64(unsafe.Sizeof(detalleDirectorio{}))
 		dotSalida += "AVD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(6) + " -> " + " DD" + strconv.Itoa(int(bitAux)) + "\n"
