@@ -86,10 +86,10 @@ type bloqueDatos struct {
 }
 
 type bitacora struct {
-	TipoOperacion [10]byte
+	TipoOperacion [8]byte
 	Tipo          byte
 	Path          [50]byte
-	Contenido     [50]byte
+	Contenido     [75]byte
 	Fecha         [16]byte
 	Tamanio       int16
 }
@@ -129,6 +129,7 @@ func formateoSistema(id, tipo string) {
 	disco, tamanioParticion, inicioParticion := obtenerDiscoMontado(id)
 
 	if disco == nil {
+		fmt.Println("El disco aun no se encuentra montado")
 		return
 	}
 
@@ -190,6 +191,9 @@ func formateoSistema(id, tipo string) {
 	binary.Write(buffer, binary.BigEndian, &super)
 	disco.Write(buffer.Bytes())
 
+	disco.Seek(int64(super.InicioLog)+(int64(super.NoAVD)*int64(unsafe.Sizeof(bitacora{}))), 0)
+	disco.Write(buffer.Bytes())
+
 	disco.Seek(int64(super.InicioBitMapAVD), 0)
 	buffer.Reset()
 	binary.Write(buffer, binary.BigEndian, uint8(1))
@@ -218,8 +222,11 @@ func formateoSistema(id, tipo string) {
 		posAux += int64(unsafe.Sizeof(bitacora{}))
 	}
 
+	contenidoDefecto := "1, G, root\n1, U, root, root, 201700965\n"
+	crearArchivo(id, "vacio", "/users.txt", contenidoDefecto, int64(len(contenidoDefecto)))
+
 	fmt.Println("Formateo de unidad completado con exito")
-	//escribir el usuario.txt
+
 	disco.Close()
 }
 
@@ -297,10 +304,123 @@ func obtenerSuperBoot(disco *os.File, inicioParticion int64) superBoot {
 	return superBootAux
 }
 
+func obtenerCopiaSuperBoot(disco *os.File, inicioCopia int64) superBoot {
+	superBootAux := superBoot{}
+	contenido := make([]byte, int(unsafe.Sizeof(superBootAux)))
+	disco.Seek(inicioCopia, 0)
+	_, err := disco.Read(contenido)
+	if err != nil {
+		fmt.Println("Error en la lectura del disco")
+	}
+	buffer := bytes.NewBuffer(contenido)
+	a := binary.Read(buffer, binary.BigEndian, &superBootAux)
+	if a != nil {
+	}
+	return superBootAux
+}
+
+func simulacionPerdida(id string) {
+	disco, _, inicio := obtenerDiscoMontado(id)
+	if disco == nil {
+		fmt.Println("El disco aun no se encuentra montado")
+		return
+	}
+
+	cambiarEstadoPerdida(id, true)
+
+	sb := obtenerSuperBoot(disco, int64(inicio))
+
+	disco.Seek(int64(inicio), 0)
+	buffer := bytes.NewBuffer([]byte{})
+	binary.Write(buffer, binary.BigEndian, uint8(0))
+
+	for i := int(inicio); i < int(sb.InicioLog); i++ {
+		disco.Write(buffer.Bytes())
+	}
+
+	disco.Close()
+
+	fmt.Println("\nSe a perdido el sistema :c")
+}
+
+func recuperarSistema(id string) {
+
+	disco, _, _ := obtenerDiscoMontado(id)
+
+	if disco == nil {
+		fmt.Println("El disco no se encuentra montado")
+		return
+	}
+
+	estado, inicioCopia := obtenerEstadoPerdida(id)
+
+	if estado == false {
+		fmt.Println("El sistema se encuentra funcionando correctamente")
+		return
+	}
+
+	cambiarEstadoPerdida(id, false)
+	sbCopia := obtenerCopiaSuperBoot(disco, inicioCopia)
+
+	instrucciones := make([]bitacora, 0)
+
+	posicionActual := int64(sbCopia.InicioLog)
+
+	for {
+		disco.Seek(posicionActual, 0)
+		bitacoraVacia := bitacora{}
+		contenido := make([]byte, int(unsafe.Sizeof(bitacora{})))
+		_, err := disco.Read(contenido)
+		if err != nil {
+		}
+		buffer := bytes.NewBuffer(contenido)
+		a := binary.Read(buffer, binary.BigEndian, &bitacoraVacia)
+		if a != nil {
+		}
+		if bitacoraVacia.Tamanio != -1 {
+			disco.Seek(posicionActual, 0)
+			bitacoraAux := bitacora{}
+			contenidoBitacora := make([]byte, int64(unsafe.Sizeof(bitacoraAux)))
+			_, err := disco.Read(contenidoBitacora)
+			if err != nil {
+			}
+			bufferBitacora := bytes.NewBuffer(contenidoBitacora)
+			a := binary.Read(bufferBitacora, binary.BigEndian, &bitacoraAux)
+			if a != nil {
+			}
+			instrucciones = append(instrucciones, bitacoraAux)
+			posicionActual += int64(unsafe.Sizeof(bitacora{}))
+		} else {
+			break
+		}
+
+	}
+
+	formateoSistema(id, "full")
+
+	for i := 0; i < len(instrucciones); i++ {
+		instruccion := retornarStringLimpio(instrucciones[i].TipoOperacion[:])
+		switch instruccion {
+		case "mkfile":
+			crearArchivo(id, "p", retornarStringLimpio(instrucciones[i].Path[:]), retornarStringLimpio(instrucciones[i].Contenido[:]), int64(instrucciones[i].Tamanio))
+		case "mkdir":
+			crearAVD(id, "p", retornarStringLimpio(instrucciones[i].Path[:]))
+		}
+	}
+
+	fmt.Println("El sistema se a recuperado exitosamente c:")
+
+}
+
 func crearAVD(id, especial, ruta string) {
 	listado := strings.Split(ruta, "/")
 
 	disco, _, inicio := obtenerDiscoMontado(id)
+
+	if disco == nil {
+		fmt.Println("El disco aun no se encuentra montado")
+		return
+	}
 
 	super = obtenerSuperBoot(disco, int64(inicio))
 
@@ -330,6 +450,9 @@ func crearAVD(id, especial, ruta string) {
 		buffer := bytes.NewBuffer([]byte{})
 		binary.Write(buffer, binary.BigEndian, &super)
 		disco.Write(buffer.Bytes())
+
+		disco.Seek(int64(super.InicioLog)+(int64(super.NoAVD)*int64(unsafe.Sizeof(bitacora{}))), 0)
+		disco.Write(buffer.Bytes())
 		disco.Close()
 	} else {
 		for i := 1; i < len(listado); i++ {
@@ -355,6 +478,8 @@ func crearAVD(id, especial, ruta string) {
 			disco.Seek(int64(inicio), 0)
 			buffer := bytes.NewBuffer([]byte{})
 			binary.Write(buffer, binary.BigEndian, &super)
+			disco.Write(buffer.Bytes())
+			disco.Seek(int64(super.InicioLog)+(int64(super.NoAVD)*int64(unsafe.Sizeof(bitacora{}))), 0)
 			disco.Write(buffer.Bytes())
 			disco.Close()
 		}
@@ -484,6 +609,11 @@ func recorrerBitMapAVD(disco *os.File, inicioBitMap, noAVD uint32) int64 {
 func crearArchivo(id, especial, ruta, cont string, size int64) {
 	disco, _, inicio := obtenerDiscoMontado(id)
 
+	if disco == nil {
+		fmt.Println("El disco aun no se encuentra montado")
+		return
+	}
+
 	contAux := cont
 
 	super = obtenerSuperBoot(disco, int64(inicio))
@@ -583,7 +713,7 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 		}
 
 		if super.NoBloquesLibres < uint32(noBloquesNecesarios) {
-			fmt.Println("No pueden crearse los bloques necesarios")
+			fmt.Print("\nNo pueden crearse los bloques necesarios\n")
 			disco.Close()
 			return
 		}
@@ -684,6 +814,8 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 		bufferEscritura.Reset()
 		disco.Seek(int64(inicio), 0)
 		binary.Write(bufferEscritura, binary.BigEndian, &super)
+		disco.Write(bufferEscritura.Bytes())
+		disco.Seek(int64(super.InicioLog)+(int64(super.NoAVD)*int64(unsafe.Sizeof(bitacora{}))), 0)
 		disco.Write(bufferEscritura.Bytes())
 
 		agregarLog(disco, "mkfile", "0", ruta, contAux, size)
@@ -923,7 +1055,8 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 		bufferEscritura.Reset()
 		binary.Write(bufferEscritura, binary.BigEndian, &super)
 		disco.Write(bufferEscritura.Bytes())
-
+		disco.Seek(int64(super.InicioLog)+(int64(super.NoAVD)*int64(unsafe.Sizeof(bitacora{}))), 0)
+		disco.Write(bufferEscritura.Bytes())
 		agregarLog(disco, "mkfile", "0", ruta, contAux, size)
 
 		disco.Close()

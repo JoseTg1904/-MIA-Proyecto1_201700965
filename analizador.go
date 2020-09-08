@@ -50,7 +50,9 @@ func analizarComandoPrincipal(entrada []string) {
 		case "chown":
 		case "chgrp":
 		case "loss":
+			analizarParametrosLoss(entrada)
 		case "recovery":
+			analizarParametrosRecovery(entrada)
 		case "rep":
 			analizarParametrosRep(entrada)
 		default:
@@ -58,6 +60,50 @@ func analizarComandoPrincipal(entrada []string) {
 		}
 	} else {
 		fmt.Println("Has echo un comentario")
+	}
+}
+
+func analizarParametrosLoss(entrada []string) {
+	id := "vacio"
+
+	for i := 1; i < len(entrada); i++ {
+		aux := strings.Split(entrada[i], "->")
+		if strings.Contains(aux[0], "#") == false {
+			switch strings.ToLower(aux[0]) {
+			case "-id":
+				id = strings.ToLower(aux[1])
+			}
+		} else {
+			break
+		}
+	}
+
+	if id != "vacio" {
+		simulacionPerdida(id)
+	} else {
+		fmt.Print("\nEl comando ingresado no es valido\n\n")
+	}
+}
+
+func analizarParametrosRecovery(entrada []string) {
+	id := "vacio"
+
+	for i := 1; i < len(entrada); i++ {
+		aux := strings.Split(entrada[i], "->")
+		if strings.Contains(aux[0], "#") == false {
+			switch strings.ToLower(aux[0]) {
+			case "-id":
+				id = strings.ToLower(aux[1])
+			}
+		} else {
+			break
+		}
+	}
+
+	if id != "vacio" {
+		recuperarSistema(id)
+	} else {
+		fmt.Print("\nEl comando ingresado no es valido\n\n")
 	}
 }
 
@@ -201,7 +247,7 @@ func analizarParametrosMkfs(entrada []string) {
 				if val := strings.ToLower(aux[1]); val == "b" || val == "k" || val == "m" {
 					unit = val
 				}
-			case "-type":
+			case "-tipo":
 				if val := strings.ToLower(aux[1]); val == "fast" || val == "full" {
 					tipo = val
 				}

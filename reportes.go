@@ -17,7 +17,7 @@ var apuntadorEstructuraAVD = int64(-1)
 var apuntadorEstructuraDD = int64(-1)
 
 func desicionReporte(id, path, ruta, nombre string) {
-	switch nombre {
+	switch strings.ToLower(nombre) {
 	case "mbr":
 		reporteMBR(id, path)
 	case "disk":
@@ -48,6 +48,18 @@ func desicionReporte(id, path, ruta, nombre string) {
 
 func reporteBitacora(id, path string) {
 	disco, _, inicio := obtenerDiscoMontado(id)
+
+	if disco == nil {
+		fmt.Println("El disco no se encuentra montado")
+		return
+	}
+
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		reporteVacio(id, path, 1)
+		return
+	}
 
 	super = obtenerSuperBoot(disco, int64(inicio))
 
@@ -82,6 +94,7 @@ func reporteBitacora(id, path string) {
 			if a != nil {
 			}
 			dotAux := strconv.Itoa(int(bitAux)) + " [shape=\"plaintext\" label= <<table>\n"
+			dotAux += "<tr><td colspan=\"6\"> Instruccion " + strconv.Itoa(int(bitAux)) + " </td></tr>"
 			dotAux += "<tr><td>Tipo de operacion</td><td>Elemento insertado</td><td>Path</td><td>Contenido</td><td>Fecha</td><td>Tamaño</td></tr>\n"
 			dotAux += "<tr>\n"
 			dotAux += "<td>" + retornarStringLimpio(bitacoraAux.TipoOperacion[:]) + "</td>\n"
@@ -128,6 +141,18 @@ func reporteBitacora(id, path string) {
 func reporteTreeDirectorio(id, path, ruta string) {
 	disco, _, inicio := obtenerDiscoMontado(id)
 
+	if disco == nil {
+		fmt.Println("El disco no se encuentra montado")
+		return
+	}
+
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		reporteVacio(id, path, 1)
+		return
+	}
+
 	super = obtenerSuperBoot(disco, int64(inicio))
 
 	dotSalida = "digraph AVD{\n"
@@ -163,6 +188,18 @@ func reporteTreeDirectorio(id, path, ruta string) {
 
 func reporteTreeFile(id, path, ruta string) {
 	disco, _, inicio := obtenerDiscoMontado(id)
+
+	if disco == nil {
+		fmt.Println("El disco no se encuentra montado")
+		return
+	}
+
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		reporteVacio(id, path, 1)
+		return
+	}
 
 	super = obtenerSuperBoot(disco, int64(inicio))
 
@@ -405,6 +442,18 @@ func recorrerAVDDirectorio(disco *os.File, inicioAvd, posicionActualAVD, bitActu
 func reporteTreeComplete(id, path string) {
 	disco, _, inicio := obtenerDiscoMontado(id)
 
+	if disco == nil {
+		fmt.Println("El disco no se encuentra montado")
+		return
+	}
+
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		reporteVacio(id, path, 1)
+		return
+	}
+
 	sb := obtenerSuperBoot(disco, int64(inicio))
 
 	dotSalida = "digraph AVD{\n"
@@ -575,6 +624,12 @@ func reporteMBR(id, path string) {
 	vacia := particion{}
 
 	disco, _, _ := obtenerDiscoMontado(id)
+
+	if disco == nil {
+		fmt.Println("El disco no se encuentra montado")
+		return
+	}
+
 	mbr := obtenerMBR(disco)
 
 	dot := "digraph MBR{\n"
@@ -616,6 +671,12 @@ func reporteDisk(id, path string) {
 	vacia := particion{}
 
 	disco, _, _ := obtenerDiscoMontado(id)
+
+	if disco == nil {
+		fmt.Println("El disco no se encuentra montado")
+		return
+	}
+
 	mbr := obtenerMBR(disco)
 
 	tamañoDisponible := float64(mbr.Tamanio)
@@ -658,6 +719,19 @@ func reporteDisk(id, path string) {
 
 func reporteSb(id, path string) {
 	disco, _, inicio := obtenerDiscoMontado(id)
+
+	if disco == nil {
+		fmt.Println("El disco no se encuentra montado")
+		return
+	}
+
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		reporteVacio(id, path, 1)
+		return
+	}
+
 	sb := obtenerSuperBoot(disco, int64(inicio))
 
 	dot := "digraph SB{\n"
@@ -709,6 +783,19 @@ func reporteSb(id, path string) {
 
 func reporteBMAVD(id, path string) {
 	disco, _, inicio := obtenerDiscoMontado(id)
+
+	if disco == nil {
+		fmt.Println("El disco no se encuentra montado")
+		return
+	}
+
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		reporteVacio(id, path, 2)
+		return
+	}
+
 	sb := obtenerSuperBoot(disco, int64(inicio))
 
 	bitMap := make([]byte, sb.NoAVD)
@@ -749,6 +836,19 @@ func reporteBMAVD(id, path string) {
 
 func reporteBMDD(id, path string) {
 	disco, _, inicio := obtenerDiscoMontado(id)
+
+	if disco == nil {
+		fmt.Println("El disco no se encuentra montado")
+		return
+	}
+
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		reporteVacio(id, path, 3)
+		return
+	}
+
 	sb := obtenerSuperBoot(disco, int64(inicio))
 
 	bitMap := make([]byte, sb.NoDD)
@@ -789,6 +889,19 @@ func reporteBMDD(id, path string) {
 
 func reporteBMINodos(id, path string) {
 	disco, _, inicio := obtenerDiscoMontado(id)
+
+	if disco == nil {
+		fmt.Println("El disco no se encuentra montado")
+		return
+	}
+
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		reporteVacio(id, path, 4)
+		return
+	}
+
 	sb := obtenerSuperBoot(disco, int64(inicio))
 
 	bitMap := make([]byte, sb.NoINodos)
@@ -829,6 +942,19 @@ func reporteBMINodos(id, path string) {
 
 func reporteBMBloques(id, path string) {
 	disco, _, inicio := obtenerDiscoMontado(id)
+
+	if disco == nil {
+		fmt.Println("El disco no se encuentra montado")
+		return
+	}
+
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		reporteVacio(id, path, 5)
+		return
+	}
+
 	sb := obtenerSuperBoot(disco, int64(inicio))
 
 	bitMap := make([]byte, sb.NoBloques)
@@ -869,6 +995,19 @@ func reporteBMBloques(id, path string) {
 
 func reporteDirectorio(id, path string) {
 	disco, _, inicio := obtenerDiscoMontado(id)
+
+	if disco == nil {
+		fmt.Println("El disco no se encuentra montado")
+		return
+	}
+
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		reporteVacio(id, path, 1)
+		return
+	}
+
 	sb := obtenerSuperBoot(disco, int64(inicio))
 
 	dotSalida = "digraph AVD{\n"
@@ -943,4 +1082,77 @@ func retornarStringLimpio(entrada []byte) string {
 	}
 
 	return salida
+}
+
+func reporteVacio(id, path string, tipo int) {
+	disco, _, _ := obtenerDiscoMontado(id)
+	_, inicioCopia := obtenerEstadoPerdida(id)
+	sbCopia := obtenerCopiaSuperBoot(disco, inicioCopia)
+	noEstructuras := int64(0)
+
+	switch tipo {
+	case 1:
+		dotSalida = "digraph Vacio{\n"
+		dotSalida += "0 [shape=\"plaintext\" label= <<table>\n"
+		dotSalida += "<tr><td> Perdi el sistema <br /> super F </td></tr></table>>]\n}"
+	case 2:
+		noEstructuras = int64(sbCopia.NoAVD)
+		//bitmap avd
+	case 3:
+		//bitmap dd
+		noEstructuras = int64(sbCopia.NoDD)
+	case 4:
+		//bitmap inodos
+		noEstructuras = int64(sbCopia.NoINodos)
+	case 5:
+		//bitmap bloques
+		noEstructuras = int64(sbCopia.NoBloques)
+	}
+
+	bitMap := make([]byte, noEstructuras)
+	contenido := make([]byte, noEstructuras)
+
+	disco.Seek(int64(sbCopia.InicioBLoques), 0)
+	_, err := disco.Read(contenido)
+	if err != nil {
+		fmt.Println("Error en la lectura del disco")
+	}
+	buffer := bytes.NewBuffer(contenido)
+	a := binary.Read(buffer, binary.BigEndian, &bitMap)
+	if a != nil {
+	}
+
+	contador := 1
+	salida := "| "
+
+	for i := 0; i < len(bitMap); i++ {
+		if bitMap[i] == 0 {
+			salida += "0 | "
+		} else {
+			salida += "1 | "
+		}
+		if contador == 20 {
+			salida += "\n| "
+			contador = 0
+		}
+		contador++
+	}
+
+	if tipo == 1 {
+		pathSinComillas := strings.ReplaceAll(path, "\"", "")
+		aux := strings.Split(pathSinComillas, ".")
+		pathDot := aux[0] + ".dot"
+		pathImagen := aux[0] + ".png"
+		archivoSalida, _ := os.Create(pathDot)
+		archivoSalida.WriteString(dotSalida)
+		archivoSalida.Close()
+
+		exec.Command("dot", pathDot, "-Tpng", "-o", pathImagen).Output()
+	} else {
+		disco.Close()
+		pathSinComillas := strings.ReplaceAll(path, "\"", "")
+		archivoSalida, _ := os.Create(pathSinComillas)
+		archivoSalida.WriteString(salida)
+		archivoSalida.Close()
+	}
 }

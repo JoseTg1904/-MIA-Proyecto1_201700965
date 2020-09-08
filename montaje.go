@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"unsafe"
 )
 
 type discoMontado struct {
@@ -13,8 +14,10 @@ type discoMontado struct {
 }
 
 type particionMontada struct {
-	Nombre [16]byte
-	ID     int
+	Nombre      [16]byte
+	ID          int
+	Perdida     bool
+	InicioCopia int64
 }
 
 var discosMontados [26]discoMontado
@@ -73,7 +76,8 @@ func montarParticion(path, name string) {
 			if discosMontados[i].ParticionesMontadas[j] != particionVacia {
 				contadorParticionesMontadas++
 			} else {
-				particion := particionMontada{ID: i + 1}
+				particion := particionMontada{ID: i + 1,
+					Perdida: false}
 				copy(particion.Nombre[:], name)
 				discosMontados[i].ParticionesMontadas[j] = particion
 				banderaParticionMontada = true
@@ -256,4 +260,88 @@ func desmontarParticionEliminada(path, nombre string) {
 			}
 		}
 	}
+}
+
+func cambiarEstadoPerdida(id string, estado bool) {
+	disco := string(id[2])
+	particion, _ := strconv.Atoi(id[3:len(id)])
+
+	discoAux := discoMontado{}
+	particionAux := particionMontada{}
+
+	j := 0
+	for j = 0; j < 26; j++ {
+		if discosMontados[j].ID == disco {
+			discoAux = discosMontados[j]
+			break
+		}
+	}
+
+	if j == 26 {
+		j = 25
+	}
+
+	if discoAux != discoVacio {
+		i := 0
+		for i = 0; i < 100; i++ {
+			if discoAux.ParticionesMontadas[i].ID == particion {
+				particionAux = discoAux.ParticionesMontadas[i]
+				break
+			}
+		}
+
+		if i == 100 {
+			i = 99
+		}
+
+		if particionAux != particionVacia {
+			discosMontados[j].ParticionesMontadas[i].Perdida = estado
+			if estado {
+				archivo, _, inicio := obtenerDiscoMontado(id)
+				sb := obtenerSuperBoot(archivo, int64(inicio))
+				discosMontados[j].ParticionesMontadas[i].InicioCopia = int64(sb.InicioLog) + (int64(sb.NoAVD) * int64(unsafe.Sizeof(bitacora{})))
+			}
+		}
+	}
+}
+
+//estado y posicion de la copia del super boot
+func obtenerEstadoPerdida(id string) (bool, int64) {
+	disco := string(id[2])
+	particion, _ := strconv.Atoi(id[3:len(id)])
+
+	discoAux := discoMontado{}
+	particionAux := particionMontada{}
+
+	j := 0
+	for j = 0; j < 26; j++ {
+		if discosMontados[j].ID == disco {
+			discoAux = discosMontados[j]
+			break
+		}
+	}
+
+	if j == 26 {
+		j = 25
+	}
+
+	if discoAux != discoVacio {
+		i := 0
+		for i = 0; i < 100; i++ {
+			if discosMontados[j].ParticionesMontadas[i].ID == particion {
+				particionAux = discoAux.ParticionesMontadas[i]
+				break
+			}
+		}
+
+		if i == 100 {
+			i = 99
+		}
+
+		if particionAux != particionVacia {
+			return discosMontados[j].ParticionesMontadas[i].Perdida, discosMontados[j].ParticionesMontadas[i].InicioCopia
+		}
+	}
+
+	return false, 0
 }
