@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"unsafe"
 )
@@ -100,7 +101,7 @@ type bitacora struct {
 	TipoOperacion [8]byte
 	Tipo          byte
 	Path          [50]byte
-	Contenido     [75]byte
+	Contenido     [100]byte
 	Fecha         [16]byte
 	Tamanio       int16
 }
@@ -234,7 +235,7 @@ func formateoSistema(id, tipo string) {
 		posAux += int64(unsafe.Sizeof(bitacora{}))
 	}
 
-	contenidoDefecto := "1, G, root\n1, U, root, root, 201700965\n"
+	contenidoDefecto := "1,G,root\n1,U,root,root,201700965\n"
 	crearArchivo(id, "vacio", "/users.txt", contenidoDefecto, int64(len(contenidoDefecto)))
 
 	fmt.Println("Formateo de unidad completado con exito")
@@ -417,6 +418,16 @@ func recuperarSistema(id string) {
 			crearArchivo(id, "p", retornarStringLimpio(instrucciones[i].Path[:]), retornarStringLimpio(instrucciones[i].Contenido[:]), int64(instrucciones[i].Tamanio))
 		case "mkdir":
 			crearAVD(id, "p", retornarStringLimpio(instrucciones[i].Path[:]))
+		case "mkgrp":
+			crearGrupo(id, retornarStringLimpio(instrucciones[i].Contenido[:]))
+		case "rmgrp":
+			eliminarGrupo(id, retornarStringLimpio(instrucciones[i].Contenido[:]))
+		case "mkusr":
+			dividido := strings.Split(retornarStringLimpio(instrucciones[i].Contenido[:]), ",")
+			sinSalto := strings.ReplaceAll(dividido[4], "\n", "")
+			crearUsuario(id, dividido[3], sinSalto, dividido[2])
+		case "rmusr":
+			eliminarUsuario(id, retornarStringLimpio(instrucciones[i].Contenido[:]))
 		}
 	}
 
@@ -669,6 +680,8 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 		rutaValidar += "/" + rutaCarpeta[i]
 	}
 
+	fmt.Println(rutaValidar)
+
 	if especial == "p" {
 		crearAVD(id, especial, rutaValidar)
 		disco, _, inicio = obtenerDiscoMontado(id)
@@ -759,6 +772,13 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 		posicionINodo := int64(super.InicioINodo) + (bitInodo * int64(unsafe.Sizeof(iNodo{})))
 		interno.ApuntadorINodo = posicionINodo
 		ddAux.ArregloArchivos[0] = interno
+
+		internoLimpio := estructuraInterndaDD{ApuntadorINodo: -1}
+		copy(internoLimpio.NombreArchivo[:], "")
+		ddAux.ArregloArchivos[1] = internoLimpio
+		ddAux.ArregloArchivos[2] = internoLimpio
+		ddAux.ArregloArchivos[3] = internoLimpio
+		ddAux.ArregloArchivos[4] = internoLimpio
 
 		j := 0
 		iterador = 0
@@ -863,14 +883,12 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 		if err != nil {
 		}
 
-		internaVacia := estructuraInterndaDD{}
-
 		banderaExistenciaArchivo := false
-		var nombreAux [20]byte
+		nombreAux := [20]byte{}
 		copy(nombreAux[:], rutaCarpeta[len(rutaCarpeta)-1])
 		i := 0
 		for i = 0; i < 5; i++ {
-			if ddAux.ArregloArchivos[i] != internaVacia {
+			if ddAux.ArregloArchivos[i].ApuntadorINodo != -1 {
 				if ddAux.ArregloArchivos[i].NombreArchivo == nombreAux {
 					banderaExistenciaArchivo = true
 					break
@@ -884,7 +902,13 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 
 		if banderaExistenciaArchivo {
 			borrarInodos(disco, ddAux.ArregloArchivos[i].ApuntadorINodo)
-			ddAux.ArregloArchivos[i] = internaVacia
+			internaLimpia := estructuraInterndaDD{ApuntadorINodo: -1}
+			copy(internaLimpia.NombreArchivo[:], "")
+			ddAux.ArregloArchivos[i] = internaLimpia
+			disco.Seek(posicionDD, 0)
+			bufferDDAUX := bytes.NewBuffer([]byte{})
+			binary.Write(bufferDDAUX, binary.BigEndian, &ddAux)
+			disco.Write(bufferDDAUX.Bytes())
 		}
 
 		banderaDisponible := false
@@ -896,7 +920,7 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 
 		i = 0
 		for i = 0; i < 5; i++ {
-			if ddAux.ArregloArchivos[i] == internaVacia {
+			if ddAux.ArregloArchivos[i].ApuntadorINodo == -1 {
 				banderaDisponible = true
 				break
 			}
@@ -937,6 +961,7 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 		err = binary.Read(bufferDD, binary.BigEndian, &ddAux)
 		if err != nil {
 		}
+
 		if banderaDDAnexo {
 			ddAux.ApuntadorExtraDD = -1
 		}
@@ -945,7 +970,7 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 
 		i = 0
 		for i = 0; i < 5; i++ {
-			if ddAux.ArregloArchivos[i] == internaVacia {
+			if ddAux.ArregloArchivos[i].ApuntadorINodo == -1 {
 				banderaDisponible = true
 				break
 			}
@@ -1095,9 +1120,9 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 func borrarInodos(disco *os.File, posicionINodo int64) {
 	bitINodo := (posicionINodo - int64(super.InicioINodo)) / int64(unsafe.Sizeof(iNodo{}))
 	disco.Seek(int64(super.InicioBitMapINodo)+bitINodo, 0)
-	buffer := bytes.NewBuffer([]byte{})
-	binary.Write(buffer, binary.BigEndian, uint8(0))
-	disco.Write(buffer.Bytes())
+	bufferBitInodo := bytes.NewBuffer([]byte{})
+	binary.Write(bufferBitInodo, binary.BigEndian, uint8(0))
+	disco.Write(bufferBitInodo.Bytes())
 
 	disco.Seek(posicionINodo, 0)
 	inodoAux := iNodo{}
@@ -1106,9 +1131,8 @@ func borrarInodos(disco *os.File, posicionINodo int64) {
 	if err != nil {
 		fmt.Println("Error en la lectura del disco")
 	}
-	buffer.Reset()
-	buffer = bytes.NewBuffer(contenido)
-	err = binary.Read(buffer, binary.BigEndian, &inodoAux)
+	bufferInodoAux := bytes.NewBuffer(contenido)
+	err = binary.Read(bufferInodoAux, binary.BigEndian, &inodoAux)
 	if err != nil {
 	}
 
@@ -1116,17 +1140,17 @@ func borrarInodos(disco *os.File, posicionINodo int64) {
 		borrarInodos(disco, inodoAux.ApuntadorExtraINodo)
 	}
 
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 4; i++ {
 		if inodoAux.ApuntadroBloques[i] != -1 {
 			borrarBloques(disco, inodoAux.ApuntadroBloques[i])
 		}
 	}
 
 	disco.Seek(posicionINodo, 0)
-	buffer.Reset()
-	binary.Write(buffer, binary.BigEndian, uint8(0))
+	bufferCeros := bytes.NewBuffer([]byte{})
+	binary.Write(bufferCeros, binary.BigEndian, uint8(0))
 	for i := 0; i < int(unsafe.Sizeof(iNodo{})); i++ {
-		disco.Write(buffer.Bytes())
+		disco.Write(bufferBitInodo.Bytes())
 	}
 	super.NoINodosLibres++
 }
@@ -1139,8 +1163,8 @@ func borrarBloques(disco *os.File, posicionBloque int64) {
 	disco.Write(buffer.Bytes())
 
 	disco.Seek(posicionBloque, 0)
-	buffer.Reset()
-	binary.Write(buffer, binary.BigEndian, uint8(0))
+	bufferCeros := bytes.NewBuffer([]byte{})
+	binary.Write(bufferCeros, binary.BigEndian, uint8(0))
 	for i := 0; i < int(unsafe.Sizeof(bloqueDatos{})); i++ {
 		disco.Write(buffer.Bytes())
 	}
@@ -1255,7 +1279,6 @@ func agregarLog(disco *os.File, operacion, tipo, path, contenido string, size in
 
 func busquedaArchivoDD(disco *os.File, posicionActualDD int64, nombre string) {
 	ddAux := detalleDirectorio{}
-	internoVacio := estructuraInterndaDD{}
 
 	contenido := make([]byte, int(unsafe.Sizeof(ddAux)))
 	disco.Seek(posicionActualDD, 0)
@@ -1272,7 +1295,7 @@ func busquedaArchivoDD(disco *os.File, posicionActualDD int64, nombre string) {
 	copy(name[:], nombre)
 
 	for i := 0; i < 5; i++ {
-		if ddAux.ArregloArchivos[i] != internoVacio {
+		if ddAux.ArregloArchivos[i].ApuntadorINodo != -1 {
 			if ddAux.ArregloArchivos[i].NombreArchivo == name {
 				existenciaArchivo = true
 				posicionActualInodo = ddAux.ArregloArchivos[i].ApuntadorINodo
@@ -1415,12 +1438,12 @@ func iniciarSesion(id, usr, pwd string) {
 
 	for i := 0; i < len(lineas)-1; i++ {
 		linea := strings.Split(lineas[i], ",")
-		if val := strings.Trim(linea[0], " "); val != "0" {
-			if strings.Trim(linea[1], " ") == "U" {
-				if strings.Trim(linea[3], " ") == usr && strings.Trim(linea[4], " ") == pwd {
+		if linea[0] != "0" {
+			if linea[1] == "U" {
+				if linea[3] == usr && linea[4] == pwd {
 					usuarioActual = usr
 					contraActual = pwd
-					grupoActual = strings.Trim(linea[2], " ")
+					grupoActual = linea[2]
 					banderaEncontado = true
 					loggeado = true
 				}
@@ -1428,10 +1451,296 @@ func iniciarSesion(id, usr, pwd string) {
 		}
 	}
 
+	disco.Close()
 	if banderaEncontado {
 		fmt.Println("A inicio sesion exitosamente")
 	} else {
 		fmt.Println("Sus credenciales no se han econtrado en el sistema")
 	}
 
+}
+
+func crearGrupo(id, name string) {
+
+	disco, _, inicio := obtenerDiscoMontado(id)
+
+	if disco == nil {
+		fmt.Println("El disco no se encuentra montado")
+		return
+	}
+
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		fmt.Println("La particion presento una perdida")
+		return
+	}
+
+	if loggeado == false {
+		fmt.Println("Debe de iniciar sesion para poder realizar estas acciones")
+		return
+	}
+
+	if grupoActual != "root" {
+		fmt.Println("Unicamente los usuarios root puede crear grupos")
+		return
+	}
+
+	if len(name) > 10 {
+		fmt.Println("No puede sobrepasar el maximo de 10 caracteres para el nombre del grupo")
+		return
+	}
+
+	super = obtenerSuperBoot(disco, int64(inicio))
+
+	contenidoUsuarios := obtenerContenidoArchivo(disco, "/users.txt")
+
+	lineas := strings.Split(contenidoUsuarios, "\n")
+
+	banderaEncontado := false
+
+	noGrupo := ""
+
+	for i := 0; i < len(lineas)-1; i++ {
+		linea := strings.Split(lineas[i], ",")
+		if linea[0] != "0" {
+			noGrupo = linea[0]
+			if linea[1] == "G" {
+				if linea[2] == name {
+					banderaEncontado = true
+					break
+				}
+			}
+		}
+	}
+
+	if banderaEncontado {
+		fmt.Println("El grupo a crear ya existe dentro del sistena")
+		return
+	}
+
+	noGrupoConvertido, _ := strconv.Atoi(noGrupo)
+	noGrupoConvertido++
+	noGrupo = strconv.Itoa(noGrupoConvertido)
+	contenidoUsuarios += noGrupo + ",G," + name + "\n"
+	crearArchivo(id, "vacio", "/users.txt", contenidoUsuarios, int64(len(contenidoUsuarios)))
+	agregarLog(disco, "mkgrp", "0", "/users.txt", name, int64(len(name)))
+	disco.Close()
+	fmt.Println("Se a agregado el nuevo grupo exitosamente")
+}
+
+func eliminarGrupo(id, name string) {
+	disco, _, inicio := obtenerDiscoMontado(id)
+
+	if disco == nil {
+		fmt.Println("El disco no se encuentra montado")
+		return
+	}
+
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		fmt.Println("La particion presento una perdida")
+		return
+	}
+
+	if loggeado == false {
+		fmt.Println("Debe de iniciar sesion para poder realizar estas acciones")
+		return
+	}
+
+	if grupoActual != "root" {
+		fmt.Println("Unicamente los usuarios root puede crear grupos")
+		return
+	}
+
+	if name == "root" {
+		fmt.Println("El grupo root no puede ser eliminado")
+		return
+	}
+
+	super = obtenerSuperBoot(disco, int64(inicio))
+
+	contenidoUsuarios := obtenerContenidoArchivo(disco, "/users.txt")
+	lineas := strings.Split(contenidoUsuarios, "\n")
+
+	banderaEncontado := false
+
+	contenidoAux := ""
+
+	for i := 0; i < len(lineas)-1; i++ {
+		linea := strings.Split(lineas[i], ",")
+		if linea[0] != "0" {
+			if linea[2] == name {
+				linea[0] = "0"
+				banderaEncontado = true
+			}
+		}
+		if linea[1] == "U" {
+			contenidoAux += linea[0] + "," + linea[1] + "," + linea[2] + "," + linea[3] + "," + linea[4] + "\n"
+		} else {
+			contenidoAux += linea[0] + "," + linea[1] + "," + linea[2] + "\n"
+		}
+	}
+
+	if banderaEncontado == false {
+		fmt.Println("El grupo a eliminar no se encuentra en el sistema")
+		return
+	}
+
+	crearArchivo(id, "vacio", "/users.txt", contenidoAux, int64(len(contenidoAux)))
+	agregarLog(disco, "rmgrp", "0", "/users.txt", name, int64(len(name)))
+	disco.Close()
+	fmt.Println("Se a eliminado el grupo exitosamente")
+}
+
+func crearUsuario(id, usr, pwd, grupo string) {
+	disco, _, inicio := obtenerDiscoMontado(id)
+
+	if disco == nil {
+		fmt.Println("El disco no se encuentra montado")
+		return
+	}
+
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		fmt.Println("La particion presento una perdida")
+		return
+	}
+
+	if loggeado == false {
+		fmt.Println("Debe de iniciar sesion para poder realizar estas acciones")
+		return
+	}
+
+	if grupoActual != "root" {
+		fmt.Println("Unicamente los usuarios root puede crear grupos")
+		return
+	}
+
+	if len(grupo) > 10 || len(usr) > 10 || len(pwd) > 10 {
+		fmt.Println("No puede sobrepasar el maximo de 10 caracteres para los parametros")
+		return
+	}
+
+	super = obtenerSuperBoot(disco, int64(inicio))
+
+	contenidoUsuarios := obtenerContenidoArchivo(disco, "/users.txt")
+
+	lineas := strings.Split(contenidoUsuarios, "\n")
+
+	banderaEncontado := false
+
+	banderaRepetido := false
+
+	nuevo := ""
+
+	contenidoAux := ""
+
+	for i := 0; i < len(lineas)-1; i++ {
+		linea := strings.Split(lineas[i], ",")
+		contenidoAux += lineas[i] + "\n"
+		if banderaEncontado == false {
+			if linea[0] != "0" {
+				if linea[1] == "G" {
+					if banderaRepetido == false {
+						if linea[2] == grupo {
+							nuevo := linea[0] + ",U," + grupo + "," + usr + "," + pwd + "\n"
+							contenidoAux += nuevo
+							banderaEncontado = true
+						}
+					}
+				} else {
+					if linea[3] == usr {
+						banderaRepetido = true
+						break
+					}
+				}
+			}
+		}
+	}
+
+	if banderaRepetido {
+		fmt.Println("El usuario ya se encuentra en el sistema")
+		return
+	}
+
+	if banderaEncontado == false {
+		fmt.Println("El grupo no se encuentra en el sistema")
+		return
+	}
+
+	crearArchivo(id, "vacio", "/users.txt", contenidoAux, int64(len(contenidoAux)))
+	agregarLog(disco, "mkusr", "0", "/users.txt", nuevo, int64(len(nuevo)))
+	disco.Close()
+	fmt.Println("Se a agregado el nuevo usuario exitosamente")
+
+}
+
+func eliminarUsuario(id, usr string) {
+	disco, _, inicio := obtenerDiscoMontado(id)
+
+	if disco == nil {
+		fmt.Println("El disco no se encuentra montado")
+		return
+	}
+
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		fmt.Println("La particion presento una perdida")
+		return
+	}
+
+	if loggeado == false {
+		fmt.Println("Debe de iniciar sesion para poder realizar estas acciones")
+		return
+	}
+
+	if grupoActual != "root" {
+		fmt.Println("Unicamente los usuarios root puede crear grupos")
+		return
+	}
+
+	if usr == "root" {
+		fmt.Println("El usuario root no puede ser eliminado")
+		return
+	}
+
+	super = obtenerSuperBoot(disco, int64(inicio))
+
+	contenidoUsuarios := obtenerContenidoArchivo(disco, "/users.txt")
+	lineas := strings.Split(contenidoUsuarios, "\n")
+
+	banderaEncontado := false
+
+	contenidoAux := ""
+
+	for i := 0; i < len(lineas)-1; i++ {
+		linea := strings.Split(lineas[i], ",")
+		if linea[0] != "0" {
+			if linea[1] == "U" {
+				if linea[3] == usr {
+					linea[0] = "0"
+					banderaEncontado = true
+				}
+			}
+		}
+		if linea[1] == "U" {
+			contenidoAux += linea[0] + "," + linea[1] + "," + linea[2] + "," + linea[3] + "," + linea[4] + "\n"
+		} else {
+			contenidoAux += linea[0] + "," + linea[1] + "," + linea[2] + "\n"
+		}
+	}
+
+	if banderaEncontado == false {
+		fmt.Println("El usuario a eliminar no se encuentra en el sistema")
+		return
+	}
+
+	crearArchivo(id, "vacio", "/users.txt", contenidoAux, int64(len(contenidoAux)))
+	agregarLog(disco, "rmusr", "0", "/users.txt", usr, int64(len(usr)))
+	disco.Close()
+	fmt.Println("Se a eliminado el grupo exitosamente")
 }

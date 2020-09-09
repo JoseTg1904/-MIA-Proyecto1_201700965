@@ -34,8 +34,11 @@ func analizarComandoPrincipal(entrada []string) {
 		case "logout":
 			cerrarSesion()
 		case "mkgrp":
+			analizarParametrosMkgrp(entrada)
 		case "rmgrp":
+			analizarParametrosRmgrp(entrada)
 		case "mkusr":
+			analizarParametrosMkusr(entrada)
 		case "rmusr":
 		case "chmod":
 		case "mkfile":
@@ -62,6 +65,37 @@ func analizarComandoPrincipal(entrada []string) {
 		}
 	} else {
 		fmt.Println("Has echo un comentario")
+	}
+}
+
+func analizarParametrosMkusr(entrada []string) {
+	id := "vacio"
+	usr := "vacio"
+	pwd := "vacio"
+	grp := "vacio"
+
+	for i := 1; i < len(entrada); i++ {
+		aux := strings.Split(entrada[i], "->")
+		if strings.Contains(aux[0], "#") == false {
+			switch strings.ToLower(aux[0]) {
+			case "-id":
+				id = strings.ToLower(aux[1])
+			case "-usr":
+				usr = obtenerPath(entrada, i)
+			case "-pwd":
+				pwd = obtenerPath(entrada, i)
+			case "-grp":
+				grp = obtenerPath(entrada, i)
+			}
+		} else {
+			break
+		}
+	}
+
+	if id != "vacio" && usr != "vacio" && pwd != "vacio" && grp != "vacio" {
+		crearUsuario(id, usr, pwd, grp)
+	} else {
+		fmt.Print("\nEl comando ingresado no es valido\n\n")
 	}
 }
 
@@ -210,6 +244,53 @@ func analizarParametrosMkdir(entrada []string) {
 }
 
 func analizarParametrosMkgrp(entrada []string) {
+	id := "vacio"
+	name := "vacio"
+
+	for i := 1; i < len(entrada); i++ {
+		aux := strings.Split(entrada[i], "->")
+		if strings.Contains(aux[0], "#") == false {
+			switch strings.ToLower(aux[0]) {
+			case "-id":
+				id = strings.ToLower(aux[1])
+			case "-name":
+				name = obtenerPath(entrada, i)
+			}
+		} else {
+			break
+		}
+	}
+
+	if id != "vacio" && name != "vacio" {
+		crearGrupo(id, name)
+	} else {
+		fmt.Print("\nEl comando ingresado no es valido\n\n")
+	}
+}
+
+func analizarParametrosRmgrp(entrada []string) {
+	id := "vacio"
+	name := "vacio"
+
+	for i := 1; i < len(entrada); i++ {
+		aux := strings.Split(entrada[i], "->")
+		if strings.Contains(aux[0], "#") == false {
+			switch strings.ToLower(aux[0]) {
+			case "-id":
+				id = strings.ToLower(aux[1])
+			case "-name":
+				name = obtenerPath(entrada, i)
+			}
+		} else {
+			break
+		}
+	}
+
+	if id != "vacio" && name != "vacio" {
+		eliminarGrupo(id, name)
+	} else {
+		fmt.Print("\nEl comando ingresado no es valido\n\n")
+	}
 }
 
 func analizarParametrosLogin(entrada []string) {

@@ -297,7 +297,6 @@ func recorrerDDFiles(disco *os.File, posicionActualDD, bitActual int64, archivo 
 	disco.Seek(posicionActualDD, 0)
 
 	ddAux := detalleDirectorio{}
-	internoVacio := estructuraInterndaDD{}
 
 	contenido := make([]byte, int(unsafe.Sizeof(ddAux)))
 	_, err := disco.Read(contenido)
@@ -313,7 +312,7 @@ func recorrerDDFiles(disco *os.File, posicionActualDD, bitActual int64, archivo 
 	dotSalida += "DD" + strconv.Itoa(int(bitActual)) + " [shape=\"plaintext\" label= <<table>\n"
 	dotSalida += "<tr><td>Detalle de directorio</td></tr>"
 	for i := 0; i < 5; i++ {
-		if ddAux.ArregloArchivos[i] != internoVacio {
+		if ddAux.ArregloArchivos[i].ApuntadorINodo != -1 {
 			dotSalida += "<tr><td port=" + "\"" + strconv.Itoa(i) + "\">" + retornarStringLimpio(ddAux.ArregloArchivos[i].NombreArchivo[:]) + "</td></tr>\n"
 		} else {
 			dotSalida += "<tr><td port=" + "\"" + strconv.Itoa(i) + "\">Sin archivo</td></tr>\n"
@@ -323,7 +322,7 @@ func recorrerDDFiles(disco *os.File, posicionActualDD, bitActual int64, archivo 
 	dotSalida += "</table>>]\n"
 
 	for i := 0; i < 5; i++ {
-		if ddAux.ArregloArchivos[i] != internoVacio {
+		if ddAux.ArregloArchivos[i].ApuntadorINodo != -1 {
 			name := [20]byte{}
 			copy(name[:], archivo)
 			if ddAux.ArregloArchivos[i].NombreArchivo == name {
@@ -349,7 +348,6 @@ func recorrerDDFile(disco *os.File, posicionActualDD, bitActual int64) {
 	disco.Seek(posicionActualDD, 0)
 
 	ddAux := detalleDirectorio{}
-	internoVacio := estructuraInterndaDD{}
 
 	contenido := make([]byte, int(unsafe.Sizeof(ddAux)))
 	_, err := disco.Read(contenido)
@@ -363,7 +361,7 @@ func recorrerDDFile(disco *os.File, posicionActualDD, bitActual int64) {
 	dotSalida += "DD" + strconv.Itoa(int(bitActual)) + " [shape=\"plaintext\" label= <<table>\n"
 	dotSalida += "<tr><td>Detalle de directorio</td></tr>"
 	for i := 0; i < 5; i++ {
-		if ddAux.ArregloArchivos[i] != internoVacio {
+		if ddAux.ArregloArchivos[i].ApuntadorINodo != -1 {
 			dotSalida += "<tr><td port=" + "\"" + strconv.Itoa(i) + "\">" + retornarStringLimpio(ddAux.ArregloArchivos[i].NombreArchivo[:]) + "</td></tr>\n"
 		} else {
 			dotSalida += "<tr><td port=" + "\"" + strconv.Itoa(i) + "\">Sin archivo</td></tr>\n"
@@ -533,7 +531,6 @@ func recorrerDD(disco *os.File, posicionActualDD, bitActual int64) {
 	disco.Seek(posicionActualDD, 0)
 
 	ddAux := detalleDirectorio{}
-	internoVacio := estructuraInterndaDD{}
 
 	contenido := make([]byte, int(unsafe.Sizeof(ddAux)))
 	_, err := disco.Read(contenido)
@@ -547,7 +544,7 @@ func recorrerDD(disco *os.File, posicionActualDD, bitActual int64) {
 	dotSalida += "DD" + strconv.Itoa(int(bitActual)) + " [shape=\"plaintext\" label= <<table>\n"
 	dotSalida += "<tr><td>Detalle de directorio</td></tr>"
 	for i := 0; i < 5; i++ {
-		if ddAux.ArregloArchivos[i] != internoVacio {
+		if ddAux.ArregloArchivos[i].ApuntadorINodo != -1 {
 			dotSalida += "<tr><td port=" + "\"" + strconv.Itoa(i) + "\">" + retornarStringLimpio(ddAux.ArregloArchivos[i].NombreArchivo[:]) + "</td></tr>\n"
 		} else {
 			dotSalida += "<tr><td port=" + "\"" + strconv.Itoa(i) + "\">Sin archivo</td></tr>\n"
@@ -557,7 +554,7 @@ func recorrerDD(disco *os.File, posicionActualDD, bitActual int64) {
 	dotSalida += "</table>>]\n"
 
 	for i := 0; i < 5; i++ {
-		if ddAux.ArregloArchivos[i] != internoVacio {
+		if ddAux.ArregloArchivos[i].ApuntadorINodo != -1 {
 			bitAux := (ddAux.ArregloArchivos[i].ApuntadorINodo - int64(super.InicioINodo)) / int64(unsafe.Sizeof(iNodo{}))
 			dotSalida += "DD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(i) + " -> " + " INodo" + strconv.Itoa(int(bitAux)) + "\n"
 			recorrerINodo(disco, ddAux.ArregloArchivos[i].ApuntadorINodo, bitAux)
