@@ -65,9 +65,9 @@ type avd struct {
 	SubDirectorios   [6]int64
 	ApuntadorDD      int64
 	ApuntadoExtraAVD int64
-	Propietario      [20]byte
-	IDGrupo          [20]byte
-	Permisos         [20]byte
+	Propietario      [10]byte
+	IDGrupo          [10]byte
+	Permisos         [3]byte
 }
 
 type detalleDirectorio struct {
@@ -88,9 +88,9 @@ type iNodo struct {
 	ContadorBloquesAsignados uint8
 	ApuntadroBloques         [4]int64
 	ApuntadorExtraINodo      int64
-	Propietario              [20]byte
-	IDGrupo                  [20]byte
-	Permiso                  [20]byte
+	Propietario              [10]byte
+	IDGrupo                  [10]byte
+	Permiso                  [3]byte
 }
 
 type bloqueDatos struct {
@@ -106,34 +106,20 @@ type bitacora struct {
 	Tamanio       int16
 }
 
-func calcularNoEstructras(tamanioParticion uint32) uint32 {
-	super := superBoot{}
-	avd := avd{}
-	//interno := estructuraInterndaDD{}
-	dd := detalleDirectorio{}
-	inodo := iNodo{}
-	datos := bloqueDatos{}
-	bitacora := bitacora{}
-
+func calcularNoEstructras(tamanioParticion uint32) (uint32, uint32, uint32) {
 	/*
-		fmt.Println("Tamaño super boot: ", unsafe.Sizeof(super))
-		fmt.Println("Tamaño avd: ", unsafe.Sizeof(avd))
-		fmt.Println("Tamaño interno dd: ", unsafe.Sizeof(interno))
-		fmt.Println("Tamaño dd: ", unsafe.Sizeof(dd))
-		fmt.Println("Tamaño I-nodo: ", unsafe.Sizeof(inodo))
-		fmt.Println("Tamaño datos: ", unsafe.Sizeof(datos))
-		fmt.Println("Tamaño bitacora: ", unsafe.Sizeof(bitacora))
-	*/
-
-	//modelo matematico
-	/*
-		NumeroDeEstructuras: (TamañoDeParticion - (2*TamañoDelSuperbloque)) /
+		Modelo matemacio:
+		No Estructuras = (TamañoDeParticion - (2*TamañoDelSuperbloque)) /
 		(27+TamArbolVirtual+TamDetalleDirectorio+(5*TamInodo+(20*TamBloque)+Bitacora))
 	*/
+	//no Inodos = 5 * no Estructuras
+	//no Bloques = 20 * no Estructuras
+	//para las demas estructuras son iguales al no Estructura
 
-	numerador := uint32(tamanioParticion - (2 * uint32(unsafe.Sizeof(super))))
-	denominador := uint32(27 + uint32(unsafe.Sizeof(avd)) + uint32(unsafe.Sizeof(dd)) + (5*uint32(unsafe.Sizeof(inodo)) + (20 * uint32(unsafe.Sizeof(datos))) + uint32(unsafe.Sizeof(bitacora))))
-	return uint32(numerador / denominador)
+	numerador := uint32(tamanioParticion - (2 * uint32(unsafe.Sizeof(superBoot{}))))
+	denominador := uint32(27 + uint32(unsafe.Sizeof(avd{})) + uint32(unsafe.Sizeof(detalleDirectorio{})) + (5*uint32(unsafe.Sizeof(iNodo{})) + (20 * uint32(unsafe.Sizeof(bloqueDatos{}))) + uint32(unsafe.Sizeof(bitacora{}))))
+	division := uint32(numerador / denominador)
+	return division, (division * 5), (division * 20)
 }
 
 func formateoSistema(id, tipo string) {
@@ -152,9 +138,7 @@ func formateoSistema(id, tipo string) {
 		disco.Write(buffer.Bytes())
 	}
 
-	noEstructuras := calcularNoEstructras(tamanioParticion)
-	noInodos := uint32(5 * noEstructuras)
-	noBloques := uint32(20 * noEstructuras)
+	noEstructuras, noInodos, noBloques := calcularNoEstructras(tamanioParticion)
 
 	super := superBoot{NoAVD: noEstructuras,
 		NoDD:             noEstructuras,
@@ -172,6 +156,7 @@ func formateoSistema(id, tipo string) {
 		BitLibreAVD:      1,
 		Carnet:           201700965}
 
+	//obteniendo el nombre del disco
 	ruta := strings.Split(disco.Name(), "/")
 	ruta = strings.Split(ruta[len(ruta)-1], ".")
 
@@ -179,6 +164,7 @@ func formateoSistema(id, tipo string) {
 	copy(super.Creacion[:], obtenerFecha())
 	copy(super.UltimoMontaje[:], obtenerFecha())
 
+	//rellenando los inicios de las secciones del formateo
 	posicion := uint32(unsafe.Sizeof(superBoot{})) + tamanioParticion
 	super.InicioBitMapAVD = posicion
 	posicion += noEstructuras
@@ -206,22 +192,18 @@ func formateoSistema(id, tipo string) {
 	disco.Seek(int64(super.InicioLog)+(int64(super.NoAVD)*int64(unsafe.Sizeof(bitacora{}))), 0)
 	disco.Write(buffer.Bytes())
 
-	disco.Seek(int64(super.InicioBitMapAVD), 0)
-	buffer.Reset()
-	binary.Write(buffer, binary.BigEndian, uint8(1))
-	disco.Write(buffer.Bytes())
+	escribirEnBitMap(disco, 1, int64(super.InicioBitMapAVD))
 
-	avd := avd{SubDirectorios: [6]int64{-1, -1, -1, -1, -1, -1},
+	avdRaiz := avd{SubDirectorios: [6]int64{-1, -1, -1, -1, -1, -1},
 		ApuntadorDD:      -1,
 		ApuntadoExtraAVD: -1}
-	copy(avd.Creacion[:], obtenerFecha())
-	copy(avd.Nombre[:], "/")
-	copy(avd.Propietario[:], "root")
+	copy(avdRaiz.Creacion[:], obtenerFecha())
+	copy(avdRaiz.Nombre[:], "/")
+	copy(avdRaiz.Propietario[:], "root")
+	copy(avdRaiz.IDGrupo[:], "root")
+	copy(avdRaiz.Permisos[:], "664")
 
-	disco.Seek(int64(super.InicioAVD), 0)
-	buffer.Reset()
-	binary.Write(buffer, binary.BigEndian, &avd)
-	disco.Write(buffer.Bytes())
+	escribirAVD(disco, int64(super.InicioAVD), avdRaiz)
 
 	posAux := int64(super.InicioLog)
 	buffer.Reset()
@@ -236,48 +218,28 @@ func formateoSistema(id, tipo string) {
 	}
 
 	contenidoDefecto := "1,G,root\n1,U,root,root,201700965\n"
-	crearArchivo(id, "vacio", "/users.txt", contenidoDefecto, int64(len(contenidoDefecto)))
+	crearArchivo(id, "vacio", "/users.txt", contenidoDefecto, int64(len(contenidoDefecto)), 0)
 
 	fmt.Println("Formateo de unidad completado con exito")
 
 	disco.Close()
 }
 
-func verificarExistenciaAVD(disco *os.File, inicioAVD int64, nombreHijo string) {
+func verificarExistenciaAVD(disco *os.File, inicioAVD int64, nombreHijo string, insercion int64) {
 	banderaEncontrado := false
 
+	//copiando el string en un arreglo de bytes para poder comparar
 	nombre := [20]byte{}
 	copy(nombre[:], nombreHijo)
 
-	avdPadre := avd{}
-	avdAux := avd{}
+	//obteniendo el avd padre
+	avdPadre := obtenerAVD(disco, inicioAVD)
 
-	//posicionando para leer la carpeta
-	disco.Seek(inicioAVD, 0)
-
-	contenido := make([]byte, int(unsafe.Sizeof(avd{})))
-	_, err := disco.Read(contenido)
-	if err != nil {
-		fmt.Println("Error en la lectura del disco")
-	}
-	buffer := bytes.NewBuffer(contenido)
-	err = binary.Read(buffer, binary.BigEndian, &avdPadre)
-	if err != nil {
-	}
-
+	//recorrido para validar si la carpeta hija se encuentra en la carpeta padre
 	i := 0
 	for i = 0; i < 6; i++ {
 		if avdPadre.SubDirectorios[i] != -1 {
-			disco.Seek(avdPadre.SubDirectorios[i], 0)
-			contenido := make([]byte, int(unsafe.Sizeof(avd{})))
-			_, err := disco.Read(contenido)
-			if err != nil {
-				fmt.Println("Error en la lectura del disco")
-			}
-			buffer := bytes.NewBuffer(contenido)
-			err = binary.Read(buffer, binary.BigEndian, &avdAux)
-			if err != nil {
-			}
+			avdAux := obtenerAVD(disco, avdPadre.SubDirectorios[i])
 			if avdAux.Nombre == nombre {
 				banderaEncontrado = true
 				break
@@ -290,12 +252,20 @@ func verificarExistenciaAVD(disco *os.File, inicioAVD int64, nombreHijo string) 
 	}
 
 	if banderaEncontrado == false {
+		//no se encontro la carpeta hija pero la carpeta padre puede tener una anexa
+		//verificar en ella
 		if avdPadre.ApuntadoExtraAVD != -1 {
-			verificarExistenciaAVD(disco, avdPadre.ApuntadoExtraAVD, nombreHijo)
+			posicionActualAVD = avdPadre.ApuntadoExtraAVD
+			verificarExistenciaAVD(disco, avdPadre.ApuntadoExtraAVD, nombreHijo, insercion)
 		} else {
 			existenciaAVD = false
+			//la carpeta buscada no existe, verificar si se desea insertar la carpeta en el sistema y crearla
+			if insercion == 1 {
+				crearAVDIndividual(disco, int64(super.InicioBitMapAVD), int64(super.InicioAVD), posicionActualAVD, obtenerBitLibreBitMap(disco, super.InicioBitMapAVD, super.NoAVD), nombreHijo)
+			}
 		}
 	} else {
+		//la carpeta buscada si existe entonces esa seria la carpeta actual para insertar archivos
 		existenciaAVD = true
 		posicionActualAVD = avdPadre.SubDirectorios[i]
 	}
@@ -306,30 +276,205 @@ func obtenerSuperBoot(disco *os.File, inicioParticion int64) superBoot {
 	superBootAux := superBoot{}
 	contenido := make([]byte, int(unsafe.Sizeof(superBootAux)))
 	disco.Seek(inicioParticion, 0)
-	_, err := disco.Read(contenido)
-	if err != nil {
-		fmt.Println("Error en la lectura del disco")
-	}
+	disco.Read(contenido)
 	buffer := bytes.NewBuffer(contenido)
-	a := binary.Read(buffer, binary.BigEndian, &superBootAux)
-	if a != nil {
-	}
+	binary.Read(buffer, binary.BigEndian, &superBootAux)
 	return superBootAux
 }
 
-func obtenerCopiaSuperBoot(disco *os.File, inicioCopia int64) superBoot {
-	superBootAux := superBoot{}
-	contenido := make([]byte, int(unsafe.Sizeof(superBootAux)))
-	disco.Seek(inicioCopia, 0)
-	_, err := disco.Read(contenido)
-	if err != nil {
-		fmt.Println("Error en la lectura del disco")
-	}
+func obtenerDD(disco *os.File, posicionDD int64) detalleDirectorio {
+	//variable que almacena el struct del avd,
+	ddAux := detalleDirectorio{}
+
+	//variable que almacena el contenido leido del disco
+	contenido := make([]byte, int(unsafe.Sizeof(ddAux)))
+
+	//poniendo el cursor en la posicion deseada
+	disco.Seek(posicionDD, 0)
+
+	//obteniendo el contenido del archivo y asignandolo a la variable del contenido
+	disco.Read(contenido)
+
+	//asignando el contenido leido a un buffer para decodificar el binario
+	bufferLectura := bytes.NewBuffer(contenido)
+
+	//decodificando el contenido del buffer y asignandolo al struct
+	binary.Read(bufferLectura, binary.BigEndian, &ddAux)
+
+	return ddAux
+}
+
+func escribirDD(disco *os.File, posicionDD int64, dd detalleDirectorio) {
+	//poniendo el cursor en la posicion deseada
+	disco.Seek(posicionDD, 0)
+
+	//creando un buffer para almacenar la informacion requerida
+	bufferEscritura := bytes.NewBuffer([]byte{})
+
+	//codificando a binario la informacion y almacenandola en el buffer
+	binary.Write(bufferEscritura, binary.BigEndian, &dd)
+
+	//escribiendo la informacion codificada en el archivo
+	disco.Write(bufferEscritura.Bytes())
+}
+
+func obtenerBloque(disco *os.File, posicionBloque int64) bloqueDatos {
+	//variable que almacena el struct del avd,
+	bloqueAux := bloqueDatos{}
+
+	//variable que almacena el contenido leido del disco
+	contenido := make([]byte, int(unsafe.Sizeof(bloqueAux)))
+
+	//poniendo el cursor en la posicion deseada
+	disco.Seek(posicionBloque, 0)
+
+	//obteniendo el contenido del archivo y asignandolo a la variable del contenido
+	disco.Read(contenido)
+
+	//asignando el contenido leido a un buffer para decodificar el binario
+	bufferLectura := bytes.NewBuffer(contenido)
+
+	//decodificando el contenido del buffer y asignandolo al struct
+	binary.Read(bufferLectura, binary.BigEndian, &bloqueAux)
+
+	return bloqueAux
+}
+
+func escribirBloque(disco *os.File, posicionBloque int64, bloque bloqueDatos) {
+	//poniendo el cursor en la posicion deseada
+	disco.Seek(posicionBloque, 0)
+
+	//creando un buffer para almacenar la informacion requerida
+	bufferEscritura := bytes.NewBuffer([]byte{})
+
+	//codificando a binario la informacion y almacenandola en el buffer
+	binary.Write(bufferEscritura, binary.BigEndian, &bloque)
+
+	//escribiendo la informacion codificada en el archivo
+	disco.Write(bufferEscritura.Bytes())
+}
+
+func obtenerInodo(disco *os.File, posicionInodo int64) iNodo {
+	//variable que almacena el struct del avd,
+	inodoAux := iNodo{}
+
+	//variable que almacena el contenido leido del disco
+	contenido := make([]byte, int(unsafe.Sizeof(inodoAux)))
+
+	//poniendo el cursor en la posicion deseada
+	disco.Seek(posicionInodo, 0)
+
+	//obteniendo el contenido del archivo y asignandolo a la variable del contenido
+	disco.Read(contenido)
+
+	//asignando el contenido leido a un buffer para decodificar el binario
+	bufferLectura := bytes.NewBuffer(contenido)
+
+	//decodificando el contenido del buffer y asignandolo al struct
+	binary.Read(bufferLectura, binary.BigEndian, &inodoAux)
+
+	return inodoAux
+}
+
+func escribirInodo(disco *os.File, posicionInodo int64, inodo iNodo) {
+	//poniendo el cursor en la posicion deseada
+	disco.Seek(posicionInodo, 0)
+
+	//creando un buffer para almacenar la informacion requerida
+	bufferEscritura := bytes.NewBuffer([]byte{})
+
+	//codificando a binario la informacion y almacenandola en el buffer
+	binary.Write(bufferEscritura, binary.BigEndian, &inodo)
+
+	//escribiendo la informacion codificada en el archivo
+	disco.Write(bufferEscritura.Bytes())
+}
+
+func obtenerAVD(disco *os.File, posicionAVD int64) avd {
+	//variable que almacena el struct del avd,
+	avdAux := avd{}
+
+	//variable que almacena el contenido leido del disco
+	contenido := make([]byte, int(unsafe.Sizeof(avdAux)))
+
+	//poniendo el cursor en la posicion deseada
+	disco.Seek(posicionAVD, 0)
+
+	//obteniendo el contenido del archivo y asignandolo a la variable del contenido
+	disco.Read(contenido)
+
+	//asignando el contenido leido a un buffer para decodificar el binario
+	bufferLectura := bytes.NewBuffer(contenido)
+
+	//decodificando el contenido del buffer y asignandolo al struct
+	binary.Read(bufferLectura, binary.BigEndian, &avdAux)
+
+	return avdAux
+}
+
+func escribirAVD(disco *os.File, posicionAVD int64, carpeta avd) {
+	//poniendo el cursor en la posicion deseada
+	disco.Seek(posicionAVD, 0)
+
+	//creando un buffer para almacenar la informacion requerida
+	bufferEscritura := bytes.NewBuffer([]byte{})
+
+	//codificando a binario la informacion y almacenandola en el buffer
+	binary.Write(bufferEscritura, binary.BigEndian, &carpeta)
+
+	//escribiendo la informacion codificada en el archivo
+	disco.Write(bufferEscritura.Bytes())
+}
+
+func escribirSuperBoot(disco *os.File, posicionSuper int64, arranque superBoot) {
+	//poniendo el cursor en la posicion deseada
+	disco.Seek(posicionSuper, 0)
+
+	//creando un buffer para almacenar la informacion requerida
+	bufferEscritura := bytes.NewBuffer([]byte{})
+
+	//codificando a binario la informacion y almacenandola en el buffer
+	binary.Write(bufferEscritura, binary.BigEndian, &arranque)
+
+	//escribiendo la informacion codificada en el archivo
+	disco.Write(bufferEscritura.Bytes())
+}
+
+func escribirEnBitMap(disco *os.File, valor uint8, posicionBit int64) {
+	//poniendo el cursor en la posicion deseada
+	disco.Seek(posicionBit, 0)
+
+	//creando un buffer para almacenar la informacion requerida
+	bufferEscritura := bytes.NewBuffer([]byte{})
+
+	//codificando a binario la informacion y almacenandola en el buffer
+	binary.Write(bufferEscritura, binary.BigEndian, &valor)
+
+	//escribiendo la informacion codificada en el archivo
+	disco.Write(bufferEscritura.Bytes())
+}
+
+func obtenerBitLibreBitMap(disco *os.File, inicioBitMap, noEstructuras uint32) int64 {
+	bitMap := make([]byte, noEstructuras)
+	contenido := make([]byte, noEstructuras)
+
+	disco.Seek(int64(inicioBitMap), 0)
+	disco.Read(contenido)
 	buffer := bytes.NewBuffer(contenido)
-	a := binary.Read(buffer, binary.BigEndian, &superBootAux)
-	if a != nil {
+	binary.Read(buffer, binary.BigEndian, &bitMap)
+
+	i := 0
+	for i = 0; i < len(bitMap); i++ {
+		if bitMap[i] == 0 {
+			break
+		}
 	}
-	return superBootAux
+
+	if i == len(bitMap) {
+		i = len(bitMap) - 1
+	}
+
+	return int64(i)
 }
 
 func simulacionPerdida(id string) {
@@ -353,7 +498,7 @@ func simulacionPerdida(id string) {
 
 	disco.Close()
 
-	fmt.Println("\nSe a perdido el sistema :c")
+	fmt.Println("Se a perdido el sistema :c")
 }
 
 func recuperarSistema(id string) {
@@ -373,7 +518,7 @@ func recuperarSistema(id string) {
 	}
 
 	cambiarEstadoPerdida(id, false)
-	sbCopia := obtenerCopiaSuperBoot(disco, inicioCopia)
+	sbCopia := obtenerSuperBoot(disco, inicioCopia)
 
 	instrucciones := make([]bitacora, 0)
 
@@ -415,9 +560,9 @@ func recuperarSistema(id string) {
 		instruccion := retornarStringLimpio(instrucciones[i].TipoOperacion[:])
 		switch instruccion {
 		case "mkfile":
-			crearArchivo(id, "p", retornarStringLimpio(instrucciones[i].Path[:]), retornarStringLimpio(instrucciones[i].Contenido[:]), int64(instrucciones[i].Tamanio))
+			crearArchivo(id, "p", retornarStringLimpio(instrucciones[i].Path[:]), retornarStringLimpio(instrucciones[i].Contenido[:]), int64(instrucciones[i].Tamanio), 1)
 		case "mkdir":
-			crearAVD(id, "p", retornarStringLimpio(instrucciones[i].Path[:]))
+			crearAVD(id, "p", retornarStringLimpio(instrucciones[i].Path[:]), 1)
 		case "mkgrp":
 			crearGrupo(id, retornarStringLimpio(instrucciones[i].Contenido[:]))
 		case "rmgrp":
@@ -435,7 +580,7 @@ func recuperarSistema(id string) {
 
 }
 
-func crearAVD(id, especial, ruta string) {
+func crearAVD(id, especial, ruta string, insercionLog int) {
 	listado := strings.Split(ruta, "/")
 
 	disco, _, inicio := obtenerDiscoMontado(id)
@@ -458,42 +603,32 @@ func crearAVD(id, especial, ruta string) {
 
 	banderaSinCrear := false
 
-	iteradorLog := 0
+	existenciaAVD = false
 
 	if especial == "p" {
 		for i := 1; i < len(listado); i++ {
-			verificarExistenciaAVD(disco, posicionActualAVD, listado[i])
-			if existenciaAVD == false {
-				if super.NoAVDLibres > 0 {
-					crearAVDIndividual(disco, int64(super.InicioBitMapAVD), int64(super.InicioAVD), posicionActualAVD, recorrerBitMapAVD(disco, super.InicioBitMapAVD, super.NoAVD), listado[i])
-					super.NoAVDLibres--
-					iteradorLog++
-				} else {
-					fmt.Println("a llegado a la capacidad maxima de creacion de carpetas")
-				}
-			}
+			verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 1)
 		}
-		if iteradorLog > 0 {
+		if insercionLog == 1 {
 			agregarLog(disco, "mkdir", "1", ruta, "", 1)
 		}
-		disco.Seek(int64(inicio), 0)
-		buffer := bytes.NewBuffer([]byte{})
-		binary.Write(buffer, binary.BigEndian, &super)
-		disco.Write(buffer.Bytes())
 
-		disco.Seek(int64(super.InicioLog)+(int64(super.NoAVD)*int64(unsafe.Sizeof(bitacora{}))), 0)
-		disco.Write(buffer.Bytes())
+		super.BitLibreAVD = uint32(obtenerBitLibreBitMap(disco, super.InicioAVD, super.NoAVD))
+
+		escribirSuperBoot(disco, int64(inicio), super)
+		escribirSuperBoot(disco, int64(super.InicioLog)+(int64(super.NoAVD)*int64(unsafe.Sizeof(bitacora{}))), super)
 		disco.Close()
+
 	} else {
 		for i := 1; i < len(listado); i++ {
-			verificarExistenciaAVD(disco, posicionActualAVD, listado[i])
+			verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 0)
 			if existenciaAVD == false {
 				if i != len(listado)-1 {
 					banderaSinCrear = true
 					break
 				} else {
 					if super.NoAVDLibres > 0 {
-						crearAVDIndividual(disco, int64(super.InicioBitMapAVD), int64(super.InicioAVD), posicionActualAVD, recorrerBitMapAVD(disco, super.InicioBitMapAVD, super.NoAVD), listado[i])
+						crearAVDIndividual(disco, int64(super.InicioBitMapAVD), int64(super.InicioAVD), posicionActualAVD, obtenerBitLibreBitMap(disco, super.InicioBitMapAVD, super.NoAVD), listado[i])
 						super.NoAVDLibres--
 					} else {
 						fmt.Println("a llegado a la capacidad maxima de creacion de carpetas")
@@ -505,29 +640,21 @@ func crearAVD(id, especial, ruta string) {
 			fmt.Println("Una de las carpetas padre aun no se encuentra creada")
 		} else {
 			agregarLog(disco, "mkdir", "1", ruta, "", 1)
-			disco.Seek(int64(inicio), 0)
-			buffer := bytes.NewBuffer([]byte{})
-			binary.Write(buffer, binary.BigEndian, &super)
-			disco.Write(buffer.Bytes())
-			disco.Seek(int64(super.InicioLog)+(int64(super.NoAVD)*int64(unsafe.Sizeof(bitacora{}))), 0)
-			disco.Write(buffer.Bytes())
+
+			super.BitLibreAVD = uint32(obtenerBitLibreBitMap(disco, super.InicioBitMapAVD, super.NoAVD))
+
+			escribirSuperBoot(disco, int64(inicio), super)
+			escribirSuperBoot(disco, int64(super.InicioLog)+(int64(super.NoAVD)*int64(unsafe.Sizeof(bitacora{}))), super)
 			disco.Close()
 		}
 	}
 }
 
 func crearAVDIndividual(disco *os.File, iniciobitAVD, inicioAVDS, posicionAVDPadre, bitHijo int64, nombre string) {
-	carpetaAux := avd{}
-	disco.Seek(posicionAVDPadre, 0)
-	contenido := make([]byte, int(unsafe.Sizeof(carpetaAux)))
-	_, err := disco.Read(contenido)
-	if err != nil {
-		fmt.Println("Error en la lectura del disco")
-	}
-	buffer := bytes.NewBuffer(contenido)
-	a := binary.Read(buffer, binary.BigEndian, &carpetaAux)
-	if a != nil {
-	}
+	//variable que almacena la carpeta a validar
+	carpetaAux := obtenerAVD(disco, posicionAVDPadre)
+
+	//verificacion de los apuntadores hacia subdirectorios de la carpeta padre
 	i := 0
 	contadorOcupados := 0
 	for i = 0; i < 6; i++ {
@@ -543,17 +670,21 @@ func crearAVDIndividual(disco *os.File, iniciobitAVD, inicioAVDS, posicionAVDPad
 	}
 
 	if contadorOcupados == 6 {
+		//verificando que se puedan crear almenos dos carpetas debido a que se crea una anexa
+		//mas la original que se pretendia crear
 		if super.NoAVDLibres >= 2 {
-			disco.Seek(posicionAVDPadre, 0)
+			//modificacion del puntero hacia carpeta anexa
 			carpetaAux.ApuntadoExtraAVD = inicioAVDS + (bitHijo * int64(unsafe.Sizeof(avd{})))
-			buffer.Reset()
-			binary.Write(buffer, binary.BigEndian, &carpetaAux)
-			disco.Write(buffer.Bytes())
+
+			//escritura de la carpeta padre con el apuntador modificado hacia su carpeta anexa
+			escribirAVD(disco, posicionAVDPadre, carpetaAux)
+
 			crearAVDAnexo(disco, iniciobitAVD, inicioAVDS, bitHijo, carpetaAux.Nombre, nombre)
 		} else {
 			fmt.Println("a llegado al maximo de inserciones de carpetas posibles")
 		}
 	} else {
+
 		//creacion individual de la carpeta
 		carpetaNueva := avd{SubDirectorios: [6]int64{-1, -1, -1, -1, -1, -1},
 			ApuntadorDD:      -1,
@@ -561,82 +692,47 @@ func crearAVDIndividual(disco *os.File, iniciobitAVD, inicioAVDS, posicionAVDPad
 		copy(carpetaNueva.Creacion[:], obtenerFecha())
 		copy(carpetaNueva.Nombre[:], nombre)
 		copy(carpetaNueva.Propietario[:], "root")
-
+		copy(carpetaNueva.IDGrupo[:], "root")
+		copy(carpetaNueva.Permisos[:], "664")
 		super.BitLibreAVD++
 
-		posicion := inicioAVDS + (bitHijo * int64(unsafe.Sizeof(avd{})))
-		carpetaAux.SubDirectorios[i] = posicion
+		posicionActualAVD = inicioAVDS + (bitHijo * int64(unsafe.Sizeof(avd{})))
 
-		disco.Seek(posicion, 0)
+		carpetaAux.SubDirectorios[i] = posicionActualAVD
 
-		buffer.Reset()
-		binary.Write(buffer, binary.BigEndian, &carpetaNueva)
-		disco.Write(buffer.Bytes())
+		escribirAVD(disco, posicionActualAVD, carpetaNueva)
 
-		disco.Seek(iniciobitAVD+bitHijo, 0)
+		escribirEnBitMap(disco, 1, (iniciobitAVD + bitHijo))
 
-		buffer.Reset()
-		binary.Write(buffer, binary.BigEndian, uint8(1))
-		disco.Write(buffer.Bytes())
-
-		disco.Seek(posicionAVDPadre, 0)
-		buffer.Reset()
-		binary.Write(buffer, binary.BigEndian, &carpetaAux)
-		disco.Write(buffer.Bytes())
+		escribirAVD(disco, posicionAVDPadre, carpetaAux)
 	}
 }
 
 func crearAVDAnexo(disco *os.File, iniciobitAVD, inicioAVDS, bitAnexa int64, nombre [20]byte, nombreHija string) {
+	//creando la carpeta anexa a la carpeta padre enviada
 	carpetaNueva := avd{SubDirectorios: [6]int64{-1, -1, -1, -1, -1, -1},
 		ApuntadorDD:      -1,
 		ApuntadoExtraAVD: -1,
 		Nombre:           nombre}
 	copy(carpetaNueva.Creacion[:], obtenerFecha())
 	copy(carpetaNueva.Propietario[:], "root")
+	copy(carpetaNueva.IDGrupo[:], "root")
+	copy(carpetaNueva.Permisos[:], "664")
 
+	//obteniendo la posicion de la carpeta anexa
 	posicion := inicioAVDS + (bitAnexa * int64(unsafe.Sizeof(avd{})))
 
-	disco.Seek(posicion, 0)
-	buffer := bytes.NewBuffer([]byte{})
-	binary.Write(buffer, binary.BigEndian, &carpetaNueva)
-	disco.Write(buffer.Bytes())
+	escribirAVD(disco, posicion, carpetaNueva)
 
-	disco.Seek(iniciobitAVD+bitAnexa, 0)
-	buffer.Reset()
-	binary.Write(buffer, binary.BigEndian, uint8(1))
-	disco.Write(buffer.Bytes())
+	escribirEnBitMap(disco, 1, (iniciobitAVD + bitAnexa))
 
-	super.BitLibreAVD++
+	//reduciendo la cantidad de avd libres
 	super.NoAVDLibres--
 
 	crearAVDIndividual(disco, iniciobitAVD, inicioAVDS, posicion, bitAnexa+1, nombreHija)
 }
 
-func recorrerBitMapAVD(disco *os.File, inicioBitMap, noAVD uint32) int64 {
-	bitMap := make([]byte, noAVD)
-	contenido := make([]byte, noAVD)
-
-	disco.Seek(int64(inicioBitMap), 0)
-	_, err := disco.Read(contenido)
-	if err != nil {
-		fmt.Println("Error en la lectura del disco")
-	}
-	buffer := bytes.NewBuffer(contenido)
-	a := binary.Read(buffer, binary.BigEndian, &bitMap)
-	if a != nil {
-	}
-
-	i := 0
-	for i = 0; i < len(bitMap); i++ {
-		if bitMap[i] == 0 {
-			break
-		}
-	}
-
-	return int64(i)
-}
-
-func crearArchivo(id, especial, ruta, cont string, size int64) {
+func crearArchivo(id, especial, ruta, cont string, size int64, insercionLog int) {
 	disco, _, inicio := obtenerDiscoMontado(id)
 
 	if disco == nil {
@@ -680,16 +776,14 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 		rutaValidar += "/" + rutaCarpeta[i]
 	}
 
-	fmt.Println(rutaValidar)
-
 	if especial == "p" {
-		crearAVD(id, especial, rutaValidar)
+		crearAVD(id, especial, rutaValidar, 1)
 		disco, _, inicio = obtenerDiscoMontado(id)
 	} else {
 		posicionActualAVD = int64(super.InicioAVD)
 		listado := strings.Split(rutaValidar, "/")
 		for i := 1; i < len(listado); i++ {
-			verificarExistenciaAVD(disco, posicionActualAVD, listado[i])
+			verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 0)
 			if existenciaAVD == false {
 				fmt.Println("Alguna de las carpetas padre no existe")
 				return
@@ -697,20 +791,10 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 		}
 	}
 
-	avdAux := avd{}
-	disco.Seek(posicionActualAVD, 0)
-	contenido := make([]byte, int(unsafe.Sizeof(avd{})))
-	_, err := disco.Read(contenido)
-	if err != nil {
-		fmt.Println("Error en la lectura del disco")
-	}
-	bufferLectura := bytes.NewBuffer(contenido)
-	err = binary.Read(bufferLectura, binary.BigEndian, &avdAux)
-	if err != nil {
-	}
+	avdAux := obtenerAVD(disco, posicionActualAVD)
 
 	if avdAux.ApuntadorDD == -1 {
-		posicionDD := int64(super.InicioDD) + (recorrerBitMapDD(disco, super.InicioBitMapDD, super.NoDD) * int64(unsafe.Sizeof(detalleDirectorio{})))
+		posicionDD := int64(super.InicioDD) + (obtenerBitLibreBitMap(disco, super.InicioBitMapDD, super.NoDD) * int64(unsafe.Sizeof(detalleDirectorio{})))
 		ddAux := detalleDirectorio{}
 		ddAux.ApuntadorExtraDD = -1
 
@@ -752,7 +836,7 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 		}
 
 		if super.NoBloquesLibres < uint32(noBloquesNecesarios) {
-			fmt.Print("\nNo pueden crearse los bloques necesarios\n")
+			fmt.Println("No pueden crearse los bloques necesarios")
 			disco.Close()
 			return
 		}
@@ -768,7 +852,7 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 			}
 		}
 
-		bitInodo := recorrerBitMapInodo(disco, super.InicioBitMapINodo, super.NoINodos)
+		bitInodo := obtenerBitLibreBitMap(disco, super.InicioBitMapINodo, super.NoINodos)
 		posicionINodo := int64(super.InicioINodo) + (bitInodo * int64(unsafe.Sizeof(iNodo{})))
 		interno.ApuntadorINodo = posicionINodo
 		ddAux.ArregloArchivos[0] = interno
@@ -787,26 +871,25 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 			inodoAux.TamanioArchivo = uint32(len(cont))
 			inodoAux.NoINodo = uint32(bitInodo)
 			inodoAux.ApuntadroBloques = [4]int64{-1, -1, -1, -1}
+			copy(inodoAux.IDGrupo[:], "root")
+			copy(inodoAux.Permiso[:], "664")
 			copy(inodoAux.Propietario[:], "root")
-			bufferEscritura := bytes.NewBuffer([]byte{})
 			for j < noBloquesNecesarios {
 				if iterador == 4 {
 					iterador = 0
 					break
 				}
-				bitBloque := recorrerBitMapBloques(disco, super.InicioBitMapBloques, super.NoBloques)
+				bitBloque := obtenerBitLibreBitMap(disco, super.InicioBitMapBloques, super.NoBloques)
 				posicionBloque := int64(super.InicioBLoques) + (bitBloque * int64(unsafe.Sizeof(bloqueDatos{})))
 				bloque := bloqueDatos{}
 				copy(bloque.Contenido[:], divisionContenido[j])
-				disco.Seek(posicionBloque, 0)
-				bufferEscritura.Reset()
-				binary.Write(bufferEscritura, binary.BigEndian, &bloque)
-				disco.Write(bufferEscritura.Bytes())
+
+				escribirBloque(disco, posicionBloque, bloque)
+
 				inodoAux.ApuntadroBloques[iterador] = posicionBloque
-				bufferEscritura.Reset()
-				disco.Seek(int64(super.InicioBitMapBloques)+bitBloque, 0)
-				binary.Write(bufferEscritura, binary.BigEndian, uint8(1))
-				disco.Write(bufferEscritura.Bytes())
+
+				escribirEnBitMap(disco, 1, int64(super.InicioBitMapBloques)+bitBloque)
+
 				j++
 				super.NoBloquesLibres = super.NoBloquesLibres - 1
 				iterador++
@@ -816,72 +899,48 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 			} else {
 				inodoAux.ContadorBloquesAsignados = uint8(iterador)
 			}
-			bufferEscritura.Reset()
-			disco.Seek(int64(super.InicioBitMapINodo)+bitInodo, 0)
-			binary.Write(bufferEscritura, binary.BigEndian, uint8(1))
-			disco.Write(bufferEscritura.Bytes())
+
+			escribirEnBitMap(disco, 1, int64(super.InicioBitMapINodo)+bitInodo)
+
 			if i == noInodosNecesarios-1 {
 				inodoAux.ApuntadorExtraINodo = -1
 			} else {
-				inodoAux.ApuntadorExtraINodo = int64(super.InicioINodo) + (recorrerBitMapInodo(disco, super.InicioBitMapINodo, super.NoINodos) * int64(unsafe.Sizeof(iNodo{})))
+				inodoAux.ApuntadorExtraINodo = int64(super.InicioINodo) + (obtenerBitLibreBitMap(disco, super.InicioBitMapINodo, super.NoINodos) * int64(unsafe.Sizeof(iNodo{})))
 			}
-			disco.Seek(posicionINodo, 0)
-			bufferEscritura.Reset()
-			binary.Write(bufferEscritura, binary.BigEndian, &inodoAux)
-			disco.Write(bufferEscritura.Bytes())
-			bitInodo = recorrerBitMapInodo(disco, super.InicioBitMapINodo, super.NoINodos)
+
+			escribirInodo(disco, posicionINodo, inodoAux)
+
+			bitInodo = obtenerBitLibreBitMap(disco, super.InicioBitMapINodo, super.NoINodos)
 			posicionINodo = int64(super.InicioINodo) + (bitInodo * int64(unsafe.Sizeof(iNodo{})))
 			super.NoINodosLibres = super.NoINodosLibres - 1
 		}
 
 		avdAux.ApuntadorDD = posicionDD
 
-		bufferEscritura := bytes.NewBuffer([]byte{})
-		disco.Seek(posicionDD, 0)
-		bufferEscritura.Reset()
-		binary.Write(bufferEscritura, binary.BigEndian, &ddAux)
-		disco.Write(bufferEscritura.Bytes())
+		escribirDD(disco, posicionDD, ddAux)
 
-		disco.Seek(recorrerBitMapDD(disco, super.InicioBitMapDD, super.NoDD)+int64(super.InicioBitMapDD), 0)
-		bufferEscritura.Reset()
-		binary.Write(bufferEscritura, binary.BigEndian, uint8(1))
-		disco.Write(bufferEscritura.Bytes())
+		escribirEnBitMap(disco, 1, obtenerBitLibreBitMap(disco, super.InicioBitMapDD, super.NoDD)+int64(super.InicioBitMapDD))
 
-		disco.Seek(posicionActualAVD, 0)
-		bufferEscritura.Reset()
-		binary.Write(bufferEscritura, binary.BigEndian, &avdAux)
-		disco.Write(bufferEscritura.Bytes())
+		escribirAVD(disco, posicionActualAVD, avdAux)
 
 		super.NoDDLibres = super.NoDDLibres - 1
-		super.BitLibreBloque = uint32(recorrerBitMapBloques(disco, super.InicioBitMapBloques, super.NoBloques))
-		super.BitLibreDD = uint32(recorrerBitMapDD(disco, super.InicioBitMapDD, super.NoDD))
-		super.BitLibreINodo = uint32(recorrerBitMapInodo(disco, super.InicioBitMapINodo, super.NoINodos))
+		super.BitLibreBloque = uint32(obtenerBitLibreBitMap(disco, super.InicioBitMapBloques, super.NoBloques))
+		super.BitLibreDD = uint32(obtenerBitLibreBitMap(disco, super.InicioBitMapDD, super.NoDD))
+		super.BitLibreINodo = uint32(obtenerBitLibreBitMap(disco, super.InicioBitMapINodo, super.NoINodos))
 
-		bufferEscritura.Reset()
-		disco.Seek(int64(inicio), 0)
-		binary.Write(bufferEscritura, binary.BigEndian, &super)
-		disco.Write(bufferEscritura.Bytes())
-		disco.Seek(int64(super.InicioLog)+(int64(super.NoAVD)*int64(unsafe.Sizeof(bitacora{}))), 0)
-		disco.Write(bufferEscritura.Bytes())
+		escribirSuperBoot(disco, int64(inicio), super)
+		escribirSuperBoot(disco, int64(super.InicioLog)+(int64(super.NoAVD)*int64(unsafe.Sizeof(bitacora{}))), super)
 
-		agregarLog(disco, "mkfile", "0", ruta, contAux, size)
+		if insercionLog == 1 {
+			agregarLog(disco, "mkfile", "0", ruta, contAux, size)
+		}
 
 		disco.Close()
-		fmt.Print("\nSe a creado el archivo exitosamente\n")
-		return
+		fmt.Println("Se a creado el archivo exitosamente")
 	} else {
 		posicionDD := avdAux.ApuntadorDD
-		disco.Seek(posicionDD, 0)
-		ddAux := detalleDirectorio{}
-		contenido := make([]byte, int(unsafe.Sizeof(detalleDirectorio{})))
-		_, err := disco.Read(contenido)
-		if err != nil {
-			fmt.Println("Error en la lectura del disco")
-		}
-		bufferDD := bytes.NewBuffer(contenido)
-		err = binary.Read(bufferDD, binary.BigEndian, &ddAux)
-		if err != nil {
-		}
+
+		ddAux := obtenerDD(disco, posicionDD)
 
 		banderaExistenciaArchivo := false
 		nombreAux := [20]byte{}
@@ -905,10 +964,7 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 			internaLimpia := estructuraInterndaDD{ApuntadorINodo: -1}
 			copy(internaLimpia.NombreArchivo[:], "")
 			ddAux.ArregloArchivos[i] = internaLimpia
-			disco.Seek(posicionDD, 0)
-			bufferDDAUX := bytes.NewBuffer([]byte{})
-			binary.Write(bufferDDAUX, binary.BigEndian, &ddAux)
-			disco.Write(bufferDDAUX.Bytes())
+			escribirDD(disco, posicionDD, ddAux)
 		}
 
 		banderaDisponible := false
@@ -935,12 +991,9 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 		if banderaDisponible == false {
 			if super.NoDD > 0 {
 				banderaDDAnexo = true
-				posicionAux := int64(super.InicioDD) + (recorrerBitMapDD(disco, super.InicioBitMapDD, super.NoDD) * int64(unsafe.Sizeof(detalleDirectorio{})))
+				posicionAux := int64(super.InicioDD) + (obtenerBitLibreBitMap(disco, super.InicioBitMapDD, super.NoDD) * int64(unsafe.Sizeof(detalleDirectorio{})))
 				ddAux.ApuntadorExtraDD = posicionAux
-				disco.Seek(posicionDD, 0)
-				bufferDDPadre := bytes.NewBuffer([]byte{})
-				binary.Write(bufferDDPadre, binary.BigEndian, &ddAux)
-				disco.Write(bufferDDPadre.Bytes())
+				escribirDD(disco, posicionDD, ddAux)
 				posicionDD = posicionAux
 				super.NoDDLibres--
 			} else {
@@ -949,18 +1002,7 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 			}
 		}
 
-		disco.Seek(posicionDD, 0)
-		ddAux = detalleDirectorio{}
-		contenido = make([]byte, int(unsafe.Sizeof(detalleDirectorio{})))
-		_, err = disco.Read(contenido)
-		if err != nil {
-			fmt.Println("Error en la lectura del disco")
-		}
-		bufferDD.Reset()
-		bufferDD = bytes.NewBuffer(contenido)
-		err = binary.Read(bufferDD, binary.BigEndian, &ddAux)
-		if err != nil {
-		}
+		ddAux = obtenerDD(disco, posicionDD)
 
 		if banderaDDAnexo {
 			ddAux.ApuntadorExtraDD = -1
@@ -1028,7 +1070,7 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 			}
 		}
 
-		bitInodo := recorrerBitMapInodo(disco, super.InicioBitMapINodo, super.NoINodos)
+		bitInodo := obtenerBitLibreBitMap(disco, super.InicioBitMapINodo, super.NoINodos)
 		posicionINodo := int64(super.InicioINodo) + (bitInodo * int64(unsafe.Sizeof(iNodo{})))
 		interno.ApuntadorINodo = posicionINodo
 		ddAux.ArregloArchivos[i] = interno
@@ -1041,25 +1083,24 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 			inodoAux.NoINodo = uint32(bitInodo)
 			inodoAux.ApuntadroBloques = [4]int64{-1, -1, -1, -1}
 			copy(inodoAux.Propietario[:], "root")
-			bufferEscritura := bytes.NewBuffer([]byte{})
+			copy(inodoAux.IDGrupo[:], "root")
+			copy(inodoAux.Permiso[:], "664")
 			for j < noBloquesNecesarios {
 				if iterador == 4 {
 					iterador = 0
 					break
 				}
-				bitBloque := recorrerBitMapBloques(disco, super.InicioBitMapBloques, super.NoBloques)
+				bitBloque := obtenerBitLibreBitMap(disco, super.InicioBitMapBloques, super.NoBloques)
 				posicionBloque := int64(super.InicioBLoques) + (bitBloque * int64(unsafe.Sizeof(bloqueDatos{})))
 				bloque := bloqueDatos{}
 				copy(bloque.Contenido[:], divisionContenido[j])
-				disco.Seek(posicionBloque, 0)
-				bufferEscritura.Reset()
-				binary.Write(bufferEscritura, binary.BigEndian, &bloque)
-				disco.Write(bufferEscritura.Bytes())
+
+				escribirBloque(disco, posicionBloque, bloque)
+
 				inodoAux.ApuntadroBloques[iterador] = posicionBloque
-				bufferEscritura.Reset()
-				disco.Seek(int64(super.InicioBitMapBloques)+bitBloque, 0)
-				binary.Write(bufferEscritura, binary.BigEndian, uint8(1))
-				disco.Write(bufferEscritura.Bytes())
+
+				escribirEnBitMap(disco, 1, int64(super.InicioBitMapBloques)+bitBloque)
+
 				j++
 				super.NoBloquesLibres--
 				iterador++
@@ -1069,72 +1110,52 @@ func crearArchivo(id, especial, ruta, cont string, size int64) {
 			} else {
 				inodoAux.ContadorBloquesAsignados = uint8(iterador)
 			}
-			bufferEscritura.Reset()
-			disco.Seek(int64(super.InicioBitMapINodo)+bitInodo, 0)
-			binary.Write(bufferEscritura, binary.BigEndian, uint8(1))
-			disco.Write(bufferEscritura.Bytes())
+
+			escribirEnBitMap(disco, 1, int64(super.InicioBitMapINodo)+bitInodo)
+
 			if i == noInodosNecesarios-1 {
 				inodoAux.ApuntadorExtraINodo = -1
 			} else {
-				inodoAux.ApuntadorExtraINodo = int64(super.InicioINodo) + (recorrerBitMapInodo(disco, super.InicioBitMapINodo, super.NoINodos) * int64(unsafe.Sizeof(iNodo{})))
+				inodoAux.ApuntadorExtraINodo = int64(super.InicioINodo) + (obtenerBitLibreBitMap(disco, super.InicioBitMapINodo, super.NoINodos) * int64(unsafe.Sizeof(iNodo{})))
 			}
-			disco.Seek(posicionINodo, 0)
-			bufferEscritura.Reset()
-			binary.Write(bufferEscritura, binary.BigEndian, &inodoAux)
-			disco.Write(bufferEscritura.Bytes())
-			bitInodo = recorrerBitMapInodo(disco, super.InicioBitMapINodo, super.NoINodos)
+
+			escribirInodo(disco, posicionINodo, inodoAux)
+
+			bitInodo = obtenerBitLibreBitMap(disco, super.InicioBitMapINodo, super.NoINodos)
 			posicionINodo = int64(super.InicioINodo) + (bitInodo * int64(unsafe.Sizeof(iNodo{})))
 			super.NoINodosLibres--
 		}
 
-		super.BitLibreBloque = uint32(recorrerBitMapBloques(disco, super.InicioBitMapBloques, super.NoBloques))
-		super.BitLibreINodo = uint32(recorrerBitMapInodo(disco, super.InicioBitMapINodo, super.NoINodos))
+		super.BitLibreBloque = uint32(obtenerBitLibreBitMap(disco, super.InicioBitMapBloques, super.NoBloques))
+		super.BitLibreINodo = uint32(obtenerBitLibreBitMap(disco, super.InicioBitMapINodo, super.NoINodos))
 
-		bufferEscritura := bytes.NewBuffer([]byte{})
-		disco.Seek(posicionDD, 0)
-		binary.Write(bufferEscritura, binary.BigEndian, &ddAux)
-		disco.Write(bufferEscritura.Bytes())
+		escribirDD(disco, posicionDD, ddAux)
 
 		if banderaDDAnexo {
-			disco.Seek(recorrerBitMapDD(disco, super.InicioBitMapDD, super.NoDD)+int64(super.InicioBitMapDD), 0)
-			bufferEscritura.Reset()
-			binary.Write(bufferEscritura, binary.BigEndian, uint8(1))
-			disco.Write(bufferEscritura.Bytes())
+			escribirEnBitMap(disco, 1, obtenerBitLibreBitMap(disco, super.InicioBitMapDD, super.NoDD)+int64(super.InicioBitMapDD))
 		}
-		super.BitLibreDD = uint32(recorrerBitMapDD(disco, super.InicioBitMapDD, super.NoDD))
-		disco.Seek(int64(inicio), 0)
-		bufferEscritura.Reset()
-		binary.Write(bufferEscritura, binary.BigEndian, &super)
-		disco.Write(bufferEscritura.Bytes())
-		disco.Seek(int64(super.InicioLog)+(int64(super.NoAVD)*int64(unsafe.Sizeof(bitacora{}))), 0)
-		disco.Write(bufferEscritura.Bytes())
-		agregarLog(disco, "mkfile", "0", ruta, contAux, size)
+
+		super.BitLibreDD = uint32(obtenerBitLibreBitMap(disco, super.InicioBitMapDD, super.NoDD))
+
+		escribirSuperBoot(disco, int64(inicio), super)
+		escribirSuperBoot(disco, int64(super.InicioLog)+(int64(super.NoAVD)*int64(unsafe.Sizeof(bitacora{}))), super)
+
+		if insercionLog == 1 {
+			agregarLog(disco, "mkfile", "0", ruta, contAux, size)
+		}
 
 		disco.Close()
 
-		fmt.Print("\nSe a creado el archivo exitosamente\n")
-		return
+		fmt.Println("Se a creado el archivo exitosamente")
 	}
 }
 
 func borrarInodos(disco *os.File, posicionINodo int64) {
 	bitINodo := (posicionINodo - int64(super.InicioINodo)) / int64(unsafe.Sizeof(iNodo{}))
-	disco.Seek(int64(super.InicioBitMapINodo)+bitINodo, 0)
-	bufferBitInodo := bytes.NewBuffer([]byte{})
-	binary.Write(bufferBitInodo, binary.BigEndian, uint8(0))
-	disco.Write(bufferBitInodo.Bytes())
 
-	disco.Seek(posicionINodo, 0)
-	inodoAux := iNodo{}
-	contenido := make([]byte, int(unsafe.Sizeof(iNodo{})))
-	_, err := disco.Read(contenido)
-	if err != nil {
-		fmt.Println("Error en la lectura del disco")
-	}
-	bufferInodoAux := bytes.NewBuffer(contenido)
-	err = binary.Read(bufferInodoAux, binary.BigEndian, &inodoAux)
-	if err != nil {
-	}
+	escribirEnBitMap(disco, 0, int64(super.InicioBitMapINodo)+bitINodo)
+
+	inodoAux := obtenerInodo(disco, posicionINodo)
 
 	if inodoAux.ApuntadorExtraINodo != -1 {
 		borrarInodos(disco, inodoAux.ApuntadorExtraINodo)
@@ -1150,97 +1171,23 @@ func borrarInodos(disco *os.File, posicionINodo int64) {
 	bufferCeros := bytes.NewBuffer([]byte{})
 	binary.Write(bufferCeros, binary.BigEndian, uint8(0))
 	for i := 0; i < int(unsafe.Sizeof(iNodo{})); i++ {
-		disco.Write(bufferBitInodo.Bytes())
+		disco.Write(bufferCeros.Bytes())
 	}
 	super.NoINodosLibres++
 }
 
 func borrarBloques(disco *os.File, posicionBloque int64) {
 	bitBloque := (posicionBloque - int64(super.InicioBLoques)) / int64(unsafe.Sizeof(bloqueDatos{}))
-	disco.Seek(int64(super.InicioBitMapBloques)+bitBloque, 0)
-	buffer := bytes.NewBuffer([]byte{})
-	binary.Write(buffer, binary.BigEndian, uint8(0))
-	disco.Write(buffer.Bytes())
+
+	escribirEnBitMap(disco, 0, int64(super.InicioBitMapBloques)+bitBloque)
 
 	disco.Seek(posicionBloque, 0)
 	bufferCeros := bytes.NewBuffer([]byte{})
 	binary.Write(bufferCeros, binary.BigEndian, uint8(0))
 	for i := 0; i < int(unsafe.Sizeof(bloqueDatos{})); i++ {
-		disco.Write(buffer.Bytes())
+		disco.Write(bufferCeros.Bytes())
 	}
 	super.NoBloquesLibres++
-}
-
-func recorrerBitMapDD(disco *os.File, inicioBitMap, noDD uint32) int64 {
-	bitMap := make([]byte, noDD)
-	contenido := make([]byte, noDD)
-
-	disco.Seek(int64(inicioBitMap), 0)
-	_, err := disco.Read(contenido)
-	if err != nil {
-		fmt.Println("Error en la lectura del disco bit map dd")
-	}
-	buffer := bytes.NewBuffer(contenido)
-	a := binary.Read(buffer, binary.BigEndian, &bitMap)
-	if a != nil {
-	}
-
-	i := 0
-	for i = 0; i < len(bitMap); i++ {
-		if bitMap[i] == 0 {
-			break
-		}
-	}
-
-	return int64(i)
-}
-
-func recorrerBitMapBloques(disco *os.File, inicioBitMap, noBloques uint32) int64 {
-	bitMap := make([]byte, noBloques)
-	contenido := make([]byte, noBloques)
-
-	disco.Seek(int64(inicioBitMap), 0)
-	_, err := disco.Read(contenido)
-	if err != nil {
-		fmt.Println("Error en la lectura del disco bit map bloques")
-	}
-	buffer := bytes.NewBuffer(contenido)
-	a := binary.Read(buffer, binary.BigEndian, &bitMap)
-	if a != nil {
-	}
-
-	i := 0
-	for i = 0; i < len(bitMap); i++ {
-		if bitMap[i] == 0 {
-			break
-		}
-	}
-
-	return int64(i)
-}
-
-func recorrerBitMapInodo(disco *os.File, inicioBitMap, noInodo uint32) int64 {
-	bitMap := make([]byte, noInodo)
-	contenido := make([]byte, noInodo)
-
-	disco.Seek(int64(inicioBitMap), 0)
-	_, err := disco.Read(contenido)
-	if err != nil {
-		fmt.Println("Error en la lectura del disco inodos")
-	}
-	buffer := bytes.NewBuffer(contenido)
-	a := binary.Read(buffer, binary.BigEndian, &bitMap)
-	if a != nil {
-	}
-
-	i := 0
-	for i = 0; i < len(bitMap); i++ {
-		if bitMap[i] == 0 {
-			break
-		}
-	}
-
-	return int64(i)
 }
 
 func agregarLog(disco *os.File, operacion, tipo, path, contenido string, size int64) {
@@ -1278,18 +1225,7 @@ func agregarLog(disco *os.File, operacion, tipo, path, contenido string, size in
 }
 
 func busquedaArchivoDD(disco *os.File, posicionActualDD int64, nombre string) {
-	ddAux := detalleDirectorio{}
-
-	contenido := make([]byte, int(unsafe.Sizeof(ddAux)))
-	disco.Seek(posicionActualDD, 0)
-	_, err := disco.Read(contenido)
-	if err != nil {
-		fmt.Println("Error en la lectura del disco")
-	}
-	buffer := bytes.NewBuffer(contenido)
-	a := binary.Read(buffer, binary.BigEndian, &ddAux)
-	if a != nil {
-	}
+	ddAux := obtenerDD(disco, posicionActualDD)
 
 	name := [20]byte{}
 	copy(name[:], nombre)
@@ -1312,35 +1248,13 @@ func busquedaArchivoDD(disco *os.File, posicionActualDD int64, nombre string) {
 }
 
 func busquedaArchivoBloques(disco *os.File, posicionActualBloque int64) {
-	bloqueAux := bloqueDatos{}
-
-	contenido := make([]byte, int(unsafe.Sizeof(bloqueAux)))
-	disco.Seek(posicionActualBloque, 0)
-	_, err := disco.Read(contenido)
-	if err != nil {
-		fmt.Println("Error en la lectura del disco")
-	}
-	buffer := bytes.NewBuffer(contenido)
-	a := binary.Read(buffer, binary.BigEndian, &bloqueAux)
-	if a != nil {
-	}
+	bloqueAux := obtenerBloque(disco, posicionActualBloque)
 
 	contenidoArchivo += retornarStringLimpio(bloqueAux.Contenido[:])
 }
 
 func busquedaArchivoInodo(disco *os.File, posicionActualInodo int64) {
-	inodoAux := iNodo{}
-
-	contenido := make([]byte, int(unsafe.Sizeof(inodoAux)))
-	disco.Seek(posicionActualInodo, 0)
-	_, err := disco.Read(contenido)
-	if err != nil {
-		fmt.Println("Error en la lectura del disco")
-	}
-	buffer := bytes.NewBuffer(contenido)
-	a := binary.Read(buffer, binary.BigEndian, &inodoAux)
-	if a != nil {
-	}
+	inodoAux := obtenerInodo(disco, posicionActualInodo)
 
 	for i := 0; i < 4; i++ {
 		if inodoAux.ApuntadroBloques[i] != -1 {
@@ -1361,24 +1275,14 @@ func obtenerContenidoArchivo(disco *os.File, path string) string {
 
 	listado := strings.Split(path, "/")
 	for i := 1; i < len(listado)-1; i++ {
-		verificarExistenciaAVD(disco, posicionActualAVD, listado[i])
+		verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 0)
 		if existenciaAVD == false {
 			fmt.Println("Alguna de las carpetas padres a las cual desea acceder no existe")
 			return ""
 		}
 	}
 
-	avdAux := avd{}
-	contenido := make([]byte, int(unsafe.Sizeof(avdAux)))
-	disco.Seek(posicionActualAVD, 0)
-	_, err := disco.Read(contenido)
-	if err != nil {
-		fmt.Println("Error en la lectura del disco")
-	}
-	buffer := bytes.NewBuffer(contenido)
-	a := binary.Read(buffer, binary.BigEndian, &avdAux)
-	if a != nil {
-	}
+	avdAux := obtenerAVD(disco, posicionActualAVD)
 
 	if avdAux.ApuntadorDD == -1 {
 		fmt.Println("La carpeta no tiene ningun archivo asociado")
@@ -1523,7 +1427,7 @@ func crearGrupo(id, name string) {
 	noGrupoConvertido++
 	noGrupo = strconv.Itoa(noGrupoConvertido)
 	contenidoUsuarios += noGrupo + ",G," + name + "\n"
-	crearArchivo(id, "vacio", "/users.txt", contenidoUsuarios, int64(len(contenidoUsuarios)))
+	crearArchivo(id, "vacio", "/users.txt", contenidoUsuarios, int64(len(contenidoUsuarios)), 0)
 	agregarLog(disco, "mkgrp", "0", "/users.txt", name, int64(len(name)))
 	disco.Close()
 	fmt.Println("Se a agregado el nuevo grupo exitosamente")
@@ -1588,7 +1492,7 @@ func eliminarGrupo(id, name string) {
 		return
 	}
 
-	crearArchivo(id, "vacio", "/users.txt", contenidoAux, int64(len(contenidoAux)))
+	crearArchivo(id, "vacio", "/users.txt", contenidoAux, int64(len(contenidoAux)), 0)
 	agregarLog(disco, "rmgrp", "0", "/users.txt", name, int64(len(name)))
 	disco.Close()
 	fmt.Println("Se a eliminado el grupo exitosamente")
@@ -1646,7 +1550,7 @@ func crearUsuario(id, usr, pwd, grupo string) {
 				if linea[1] == "G" {
 					if banderaRepetido == false {
 						if linea[2] == grupo {
-							nuevo := linea[0] + ",U," + grupo + "," + usr + "," + pwd + "\n"
+							nuevo = linea[0] + ",U," + grupo + "," + usr + "," + pwd + "\n"
 							contenidoAux += nuevo
 							banderaEncontado = true
 						}
@@ -1671,7 +1575,7 @@ func crearUsuario(id, usr, pwd, grupo string) {
 		return
 	}
 
-	crearArchivo(id, "vacio", "/users.txt", contenidoAux, int64(len(contenidoAux)))
+	crearArchivo(id, "vacio", "/users.txt", contenidoAux, int64(len(contenidoAux)), 0)
 	agregarLog(disco, "mkusr", "0", "/users.txt", nuevo, int64(len(nuevo)))
 	disco.Close()
 	fmt.Println("Se a agregado el nuevo usuario exitosamente")
@@ -1739,8 +1643,486 @@ func eliminarUsuario(id, usr string) {
 		return
 	}
 
-	crearArchivo(id, "vacio", "/users.txt", contenidoAux, int64(len(contenidoAux)))
+	crearArchivo(id, "vacio", "/users.txt", contenidoAux, int64(len(contenidoAux)), 0)
 	agregarLog(disco, "rmusr", "0", "/users.txt", usr, int64(len(usr)))
 	disco.Close()
 	fmt.Println("Se a eliminado el grupo exitosamente")
+}
+
+func mostrarContenidoArchivo(id, path string) {
+	disco, _, inicio := obtenerDiscoMontado(id)
+
+	if disco == nil {
+		fmt.Println("El disco no se encuentra montado")
+		return
+	}
+
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		fmt.Println("La particion presento una perdida")
+		return
+	}
+
+	super = obtenerSuperBoot(disco, int64(inicio))
+
+	contenido := obtenerContenidoArchivo(disco, path)
+
+	fmt.Println("El contenido del archivo", path, "es: ")
+	fmt.Println(contenido)
+	disco.Close()
+}
+
+func modificarContenidoArchivo(id, ruta, cont string, size int64) {
+	disco, _, inicio := obtenerDiscoMontado(id)
+
+	if disco == nil {
+		fmt.Println("El disco aun no se encuentra montado")
+		return
+	}
+
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		fmt.Println("La particion presento una perdida")
+		return
+	}
+
+	contAux := cont
+
+	super = obtenerSuperBoot(disco, int64(inicio))
+
+	if size == -1 {
+		size = int64(len(cont))
+	} else if size > int64(len(cont)) {
+		iterador := 0
+		for {
+			if len(cont) == int(size) {
+				break
+			}
+			cont += arregloLetras[iterador]
+			iterador++
+			if iterador == len(arregloLetras) {
+				iterador = 0
+			}
+		}
+	} else if size < int64(len(cont)) {
+		cont = cont[:size]
+	}
+
+	rutaCarpeta := strings.Split(ruta, "/")
+
+	rutaValidar := ""
+	for i := 1; i < len(rutaCarpeta)-1; i++ {
+		rutaValidar += "/" + rutaCarpeta[i]
+	}
+
+	posicionActualAVD = int64(super.InicioAVD)
+	listado := strings.Split(rutaValidar, "/")
+	for i := 1; i < len(listado); i++ {
+		verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 0)
+		if existenciaAVD == false {
+			fmt.Println("Alguna de las carpetas padre no existe")
+			return
+		}
+	}
+
+	avdAux := avd{}
+	disco.Seek(posicionActualAVD, 0)
+	contenido := make([]byte, int(unsafe.Sizeof(avd{})))
+	_, err := disco.Read(contenido)
+	if err != nil {
+		fmt.Println("Error en la lectura del disco")
+	}
+	bufferLectura := bytes.NewBuffer(contenido)
+	err = binary.Read(bufferLectura, binary.BigEndian, &avdAux)
+	if err != nil {
+	}
+
+	if avdAux.ApuntadorDD == -1 {
+		fmt.Println("La carpeta no contiene ningun archivo")
+		return
+	}
+
+	posicionDD := avdAux.ApuntadorDD
+	disco.Seek(posicionDD, 0)
+	ddAux := detalleDirectorio{}
+	contenidoDD := make([]byte, int(unsafe.Sizeof(detalleDirectorio{})))
+	_, err1 := disco.Read(contenidoDD)
+	if err1 != nil {
+		fmt.Println("Error en la lectura del disco")
+	}
+	bufferDD := bytes.NewBuffer(contenidoDD)
+	err = binary.Read(bufferDD, binary.BigEndian, &ddAux)
+	if err != nil {
+	}
+
+	banderaExistenciaArchivo := false
+	nombreAux := [20]byte{}
+	copy(nombreAux[:], rutaCarpeta[len(rutaCarpeta)-1])
+	i := 0
+	for i = 0; i < 5; i++ {
+		if ddAux.ArregloArchivos[i].ApuntadorINodo != -1 {
+			if ddAux.ArregloArchivos[i].NombreArchivo == nombreAux {
+				banderaExistenciaArchivo = true
+				break
+			}
+		}
+	}
+
+	if i == 5 {
+		i = 4
+	}
+
+	if banderaExistenciaArchivo {
+		borrarInodos(disco, ddAux.ArregloArchivos[i].ApuntadorINodo)
+		internaLimpia := estructuraInterndaDD{ApuntadorINodo: -1}
+		copy(internaLimpia.NombreArchivo[:], "")
+		ddAux.ArregloArchivos[i] = internaLimpia
+		disco.Seek(posicionDD, 0)
+		bufferDDAUX := bytes.NewBuffer([]byte{})
+		binary.Write(bufferDDAUX, binary.BigEndian, &ddAux)
+		disco.Write(bufferDDAUX.Bytes())
+	}
+
+	banderaDisponible := false
+
+	if super.NoDDLibres == 0 {
+		fmt.Println("Ya no se pueden crear mas detalles de directorio")
+		return
+	}
+
+	i = 0
+	for i = 0; i < 5; i++ {
+		if ddAux.ArregloArchivos[i].ApuntadorINodo == -1 {
+			banderaDisponible = true
+			break
+		}
+	}
+
+	if i == 5 {
+		i = 4
+	}
+
+	banderaDDAnexo := false
+
+	if banderaDisponible == false {
+		if super.NoDD > 0 {
+			banderaDDAnexo = true
+			posicionAux := int64(super.InicioDD) + (obtenerBitLibreBitMap(disco, super.InicioBitMapDD, super.NoDD) * int64(unsafe.Sizeof(detalleDirectorio{})))
+			ddAux.ApuntadorExtraDD = posicionAux
+			disco.Seek(posicionDD, 0)
+			bufferDDPadre := bytes.NewBuffer([]byte{})
+			binary.Write(bufferDDPadre, binary.BigEndian, &ddAux)
+			disco.Write(bufferDDPadre.Bytes())
+			posicionDD = posicionAux
+			super.NoDDLibres--
+		} else {
+			fmt.Println("No se pueden crear mas detalles de directorio")
+			return
+		}
+	}
+
+	disco.Seek(posicionDD, 0)
+	ddAux = detalleDirectorio{}
+	contenido = make([]byte, int(unsafe.Sizeof(detalleDirectorio{})))
+	_, err = disco.Read(contenido)
+	if err != nil {
+		fmt.Println("Error en la lectura del disco")
+	}
+	bufferDD.Reset()
+	bufferDD = bytes.NewBuffer(contenido)
+	err = binary.Read(bufferDD, binary.BigEndian, &ddAux)
+	if err != nil {
+	}
+
+	if banderaDDAnexo {
+		ddAux.ApuntadorExtraDD = -1
+	}
+
+	banderaDisponible = false
+
+	i = 0
+	for i = 0; i < 5; i++ {
+		if ddAux.ArregloArchivos[i].ApuntadorINodo == -1 {
+			banderaDisponible = true
+			break
+		}
+	}
+
+	if i == 5 {
+		i = 4
+	}
+
+	interno := estructuraInterndaDD{}
+	copy(interno.Creacion[:], obtenerFecha())
+	copy(interno.Modificacion[:], obtenerFecha())
+	copy(interno.NombreArchivo[:], rutaCarpeta[len(rutaCarpeta)-1])
+
+	noBloquesNecesarios := 1
+	iterador := 0
+	for i := 0; i < len(cont); i++ {
+		if iterador == 25 {
+			iterador = 0
+			noBloquesNecesarios++
+		}
+		iterador++
+	}
+
+	noInodosNecesarios := 1
+	iterador = 0
+	for i := 0; i < noBloquesNecesarios; i++ {
+		if iterador == 4 {
+			iterador = 0
+			noInodosNecesarios++
+		}
+		iterador++
+	}
+
+	if super.NoINodosLibres < uint32(noInodosNecesarios) {
+		fmt.Println("No pueden crearse los inodos necesarios")
+		disco.Close()
+		return
+	}
+
+	if super.NoBloquesLibres < uint32(noBloquesNecesarios) {
+		fmt.Println("No pueden crearse los bloques necesarios")
+		disco.Close()
+		return
+	}
+
+	inicioDivision := 0
+	divisionContenido := make([]string, noBloquesNecesarios)
+	for i := 0; i < noBloquesNecesarios; i++ {
+		if i == noBloquesNecesarios-1 {
+			divisionContenido[i] = cont[inicioDivision:len(cont)]
+		} else {
+			divisionContenido[i] = cont[inicioDivision : inicioDivision+25]
+			inicioDivision += 25
+		}
+	}
+
+	bitInodo := obtenerBitLibreBitMap(disco, super.InicioBitMapINodo, super.NoINodos)
+	posicionINodo := int64(super.InicioINodo) + (bitInodo * int64(unsafe.Sizeof(iNodo{})))
+	interno.ApuntadorINodo = posicionINodo
+	ddAux.ArregloArchivos[i] = interno
+
+	j := 0
+	iterador = 0
+	for i := 0; i < noInodosNecesarios; i++ {
+		inodoAux := iNodo{}
+		inodoAux.TamanioArchivo = uint32(len(cont))
+		inodoAux.NoINodo = uint32(bitInodo)
+		inodoAux.ApuntadroBloques = [4]int64{-1, -1, -1, -1}
+		copy(inodoAux.Propietario[:], "root")
+		copy(inodoAux.IDGrupo[:], "root")
+		copy(inodoAux.Permiso[:], "664")
+		bufferEscritura := bytes.NewBuffer([]byte{})
+		for j < noBloquesNecesarios {
+			if iterador == 4 {
+				iterador = 0
+				break
+			}
+			bitBloque := obtenerBitLibreBitMap(disco, super.InicioBitMapBloques, super.NoBloques)
+			posicionBloque := int64(super.InicioBLoques) + (bitBloque * int64(unsafe.Sizeof(bloqueDatos{})))
+			bloque := bloqueDatos{}
+			copy(bloque.Contenido[:], divisionContenido[j])
+			disco.Seek(posicionBloque, 0)
+			bufferEscritura.Reset()
+			binary.Write(bufferEscritura, binary.BigEndian, &bloque)
+			disco.Write(bufferEscritura.Bytes())
+			inodoAux.ApuntadroBloques[iterador] = posicionBloque
+			bufferEscritura.Reset()
+			disco.Seek(int64(super.InicioBitMapBloques)+bitBloque, 0)
+			binary.Write(bufferEscritura, binary.BigEndian, uint8(1))
+			disco.Write(bufferEscritura.Bytes())
+			j++
+			super.NoBloquesLibres--
+			iterador++
+		}
+		if iterador == 0 {
+			inodoAux.ContadorBloquesAsignados = uint8(4)
+		} else {
+			inodoAux.ContadorBloquesAsignados = uint8(iterador)
+		}
+		bufferEscritura.Reset()
+		disco.Seek(int64(super.InicioBitMapINodo)+bitInodo, 0)
+		binary.Write(bufferEscritura, binary.BigEndian, uint8(1))
+		disco.Write(bufferEscritura.Bytes())
+		if i == noInodosNecesarios-1 {
+			inodoAux.ApuntadorExtraINodo = -1
+		} else {
+			inodoAux.ApuntadorExtraINodo = int64(super.InicioINodo) + (obtenerBitLibreBitMap(disco, super.InicioBitMapINodo, super.NoINodos) * int64(unsafe.Sizeof(iNodo{})))
+		}
+		disco.Seek(posicionINodo, 0)
+		bufferEscritura.Reset()
+		binary.Write(bufferEscritura, binary.BigEndian, &inodoAux)
+		disco.Write(bufferEscritura.Bytes())
+		bitInodo = obtenerBitLibreBitMap(disco, super.InicioBitMapINodo, super.NoINodos)
+		posicionINodo = int64(super.InicioINodo) + (bitInodo * int64(unsafe.Sizeof(iNodo{})))
+		super.NoINodosLibres--
+	}
+
+	super.BitLibreBloque = uint32(obtenerBitLibreBitMap(disco, super.InicioBitMapBloques, super.NoBloques))
+	super.BitLibreINodo = uint32(obtenerBitLibreBitMap(disco, super.InicioBitMapINodo, super.NoINodos))
+
+	bufferEscritura := bytes.NewBuffer([]byte{})
+	disco.Seek(posicionDD, 0)
+	binary.Write(bufferEscritura, binary.BigEndian, &ddAux)
+	disco.Write(bufferEscritura.Bytes())
+
+	if banderaDDAnexo {
+		disco.Seek(obtenerBitLibreBitMap(disco, super.InicioBitMapDD, super.NoDD)+int64(super.InicioBitMapDD), 0)
+		bufferEscritura.Reset()
+		binary.Write(bufferEscritura, binary.BigEndian, uint8(1))
+		disco.Write(bufferEscritura.Bytes())
+	}
+	super.BitLibreDD = uint32(obtenerBitLibreBitMap(disco, super.InicioBitMapDD, super.NoDD))
+	disco.Seek(int64(inicio), 0)
+	bufferEscritura.Reset()
+	binary.Write(bufferEscritura, binary.BigEndian, &super)
+	disco.Write(bufferEscritura.Bytes())
+	disco.Seek(int64(super.InicioLog)+(int64(super.NoAVD)*int64(unsafe.Sizeof(bitacora{}))), 0)
+	disco.Write(bufferEscritura.Bytes())
+	agregarLog(disco, "mkfile", "0", ruta, contAux, size)
+
+	disco.Close()
+
+	fmt.Print("\nSe a creado el archivo exitosamente\n")
+}
+
+func modificarNombre(id, path, name string) {
+	disco, _, inicio := obtenerDiscoMontado(id)
+
+	if disco == nil {
+		fmt.Println("El disco aun no se encuentra montado")
+		return
+	}
+
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		fmt.Println("La particion presento una perdida")
+		return
+	}
+
+	super = obtenerSuperBoot(disco, int64(inicio))
+
+	posicionActualAVD = int64(super.InicioAVD)
+
+	banderaSinCrear := false
+
+	listado := strings.Split(path, "/")
+
+	if strings.Contains(path, ".txt") {
+		for i := 1; i < len(listado)-1; i++ {
+			verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 0)
+			if existenciaAVD == false {
+				if i != len(listado)-1 {
+					banderaSinCrear = true
+					break
+				}
+			}
+		}
+
+		if banderaSinCrear {
+			fmt.Println("Una de las carpetas padre aun no se encuentra creada")
+			return
+		}
+
+		//modificar nombre del archivo
+	} else {
+		for i := 1; i < len(listado); i++ {
+			verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 0)
+			if existenciaAVD == false {
+				if i != len(listado)-1 {
+					banderaSinCrear = true
+					break
+				}
+			}
+		}
+
+		if banderaSinCrear {
+			fmt.Println("Una de las carpetas padre aun no se encuentra creada")
+			return
+		}
+
+		avdAux := avd{}
+
+		//posicionando para leer la carpeta
+		disco.Seek(posicionActualAVD, 0)
+
+		contenido := make([]byte, int(unsafe.Sizeof(avd{})))
+		_, err := disco.Read(contenido)
+		if err != nil {
+			fmt.Println("Error en la lectura del disco")
+		}
+		buffer := bytes.NewBuffer(contenido)
+		err = binary.Read(buffer, binary.BigEndian, &avdAux)
+		if err != nil {
+		}
+
+		copy(avdAux.Nombre[:], "")
+		copy(avdAux.Nombre[:], name)
+
+		agregarLog(disco, "ren", "1", path, name, 1)
+		disco.Close()
+		fmt.Println("Se a modificado el nombre de la carpeta exitosamente")
+		//modificar nombre de la carpeta
+
+	}
+}
+
+func eliminarArchivosOCarpetas(id, path, especial string) {
+	disco, _, inicio := obtenerDiscoMontado(id)
+
+	if disco == nil {
+		fmt.Println("El disco aun no se encuentra montado")
+		return
+	}
+
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		fmt.Println("La particion presento una perdida")
+		return
+	}
+
+	super = obtenerSuperBoot(disco, int64(inicio))
+
+	posicionActualAVD = int64(super.InicioAVD)
+
+	banderaSinCrear := false
+
+	listado := strings.Split(path, "/")
+
+	for i := 1; i < len(listado); i++ {
+		verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 0)
+		if existenciaAVD == false {
+			if i != len(listado)-1 {
+				banderaSinCrear = true
+				break
+			}
+		}
+	}
+
+	if banderaSinCrear {
+		fmt.Println("Una de las carpetas padre aun no se encuentra creada")
+	} else {
+
+		if strings.Contains(path, ".txt") {
+
+		} else {
+			agregarLog(disco, "mkdir", "1", path, "", 1)
+			disco.Seek(int64(inicio), 0)
+			buffer := bytes.NewBuffer([]byte{})
+			binary.Write(buffer, binary.BigEndian, &super)
+			disco.Write(buffer.Bytes())
+			disco.Seek(int64(super.InicioLog)+(int64(super.NoAVD)*int64(unsafe.Sizeof(bitacora{}))), 0)
+			disco.Write(buffer.Bytes())
+			disco.Close()
+		}
+
+	}
+
 }

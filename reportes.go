@@ -1084,7 +1084,7 @@ func retornarStringLimpio(entrada []byte) string {
 func reporteVacio(id, path string, tipo int) {
 	disco, _, _ := obtenerDiscoMontado(id)
 	_, inicioCopia := obtenerEstadoPerdida(id)
-	sbCopia := obtenerCopiaSuperBoot(disco, inicioCopia)
+	sbCopia := obtenerSuperBoot(disco, inicioCopia)
 	noEstructuras := int64(0)
 
 	switch tipo {

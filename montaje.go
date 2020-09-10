@@ -14,10 +14,13 @@ type discoMontado struct {
 }
 
 type particionMontada struct {
-	Nombre      [16]byte
-	ID          int
-	Perdida     bool
-	InicioCopia int64
+	Nombre        [16]byte
+	ID            int
+	Perdida       bool
+	InicioCopia   int64
+	UsuarioActual string
+	ContraActual  string
+	GrupoActual   string
 }
 
 var discosMontados [26]discoMontado

@@ -40,12 +40,15 @@ func analizarComandoPrincipal(entrada []string) {
 		case "mkusr":
 			analizarParametrosMkusr(entrada)
 		case "rmusr":
+			analizarParametrosRmusr(entrada)
 		case "chmod":
 		case "mkfile":
 			analizarParametrosMkfile(entrada)
 		case "cat":
+			analizarParametrosCat(entrada)
 		case "rm":
 		case "edit":
+			analizarParametrosEdit(entrada)
 		case "ren":
 		case "mkdir":
 			analizarParametrosMkdir(entrada)
@@ -65,6 +68,124 @@ func analizarComandoPrincipal(entrada []string) {
 		}
 	} else {
 		fmt.Println("Has echo un comentario")
+	}
+}
+
+func analizarParametrosRm(entrada []string) {
+	id := "vacio"
+	path := "vacio"
+	especial := "vacio"
+
+	for i := 1; i < len(entrada); i++ {
+		aux := strings.Split(entrada[i], "->")
+		if strings.Contains(aux[0], "#") == false {
+			switch strings.ToLower(aux[0]) {
+			case "-rf":
+				especial = "rf"
+			case "-path":
+				path = obtenerPath(entrada, i)
+			case "-id":
+				id = strings.ToLower(aux[1])
+			}
+		} else {
+			break
+		}
+	}
+
+	if id != "vacio" && path != "vacio" {
+		//eliminar
+		fmt.Println(especial)
+	} else {
+		fmt.Print("\nEl comando ingresado no es valido\n\n")
+	}
+}
+
+func analizarParametrosEdit(entrada []string) {
+	id := "vacio"
+	path := "vacio"
+	size := -1
+	cont := ""
+
+	for i := 1; i < len(entrada); i++ {
+		aux := strings.Split(entrada[i], "->")
+		if strings.Contains(aux[0], "#") == false {
+			switch strings.ToLower(aux[0]) {
+			case "-path":
+				path = obtenerPath(entrada, i)
+			case "-id":
+				id = strings.ToLower(aux[1])
+			case "-size":
+				if val, _ := strconv.Atoi(aux[1]); val >= 0 {
+					size, _ = strconv.Atoi(aux[1])
+				} else {
+					fmt.Print("\nEl parametro size debe de ser igual o mayor a cero\n\n")
+					return
+				}
+			case "-cont":
+				cont = obtenerPath(entrada, i)
+			}
+		} else {
+			break
+		}
+	}
+
+	if id != "vacio" && path != "vacio" {
+		modificarContenidoArchivo(id, path, cont, int64(size))
+	} else {
+		fmt.Print("\nEl comando ingresado no es valido\n\n")
+	}
+}
+
+func analizarParametrosCat(entrada []string) {
+	listado := make([]string, 0)
+	id := "vacio"
+
+	for i := 1; i < len(entrada); i++ {
+		aux := strings.Split(entrada[i], "->")
+		if strings.Contains(aux[0], "#") == false {
+			match, _ := regexp.MatchString("-file([0-9]+)", strings.ToLower(aux[0]))
+			if match {
+				listado = append(listado, obtenerPath(entrada, i))
+			}
+			if aux[0] == "-id" {
+				id = strings.ToLower(aux[1])
+			}
+		} else {
+			break
+		}
+	}
+
+	if len(listado) > 0 && id != "vacio" {
+		for i := 0; i < len(listado); i++ {
+			mostrarContenidoArchivo(id, listado[i])
+		}
+	} else {
+		fmt.Println("El comando ingresado no es valido")
+	}
+}
+
+func analizarParametrosRmusr(entrada []string) {
+	id := "vacio"
+	usr := "vacio"
+
+	for i := 1; i < len(entrada); i++ {
+		aux := strings.Split(entrada[i], "->")
+		if strings.Contains(aux[0], "#") == false {
+			switch strings.ToLower(aux[0]) {
+			case "-id":
+				id = strings.ToLower(aux[1])
+			case "-usr":
+				usr = obtenerPath(entrada, i)
+			}
+		} else {
+			break
+		}
+	}
+
+	if id != "vacio" && usr != "vacio" {
+		eliminarUsuario(id, usr)
+	} else {
+		fmt.Print("\nEl comando ingresado no es valido\n\n")
 	}
 }
 
@@ -176,7 +297,7 @@ func analizarParametrosMkfile(entrada []string) {
 	}
 
 	if id != "vacio" && path != "vacio" {
-		crearArchivo(id, especial, path, cont, int64(size))
+		crearArchivo(id, especial, path, cont, int64(size), 1)
 	} else {
 		fmt.Print("\nEl comando ingresado no es valido\n\n")
 	}
@@ -237,7 +358,7 @@ func analizarParametrosMkdir(entrada []string) {
 	}
 
 	if id != "vacio" && path != "vacio" {
-		crearAVD(id, especial, path)
+		crearAVD(id, especial, path, 1)
 	} else {
 		fmt.Println("El comando ingresado no es valido")
 	}
