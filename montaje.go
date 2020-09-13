@@ -79,7 +79,7 @@ func montarParticion(path, name string) {
 			if discosMontados[i].ParticionesMontadas[j] != particionVacia {
 				contadorParticionesMontadas++
 			} else {
-				particion := particionMontada{ID: i + 1,
+				particion := particionMontada{ID: j + 1,
 					Perdida: false}
 				copy(particion.Nombre[:], name)
 				discosMontados[i].ParticionesMontadas[j] = particion

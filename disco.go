@@ -31,17 +31,16 @@ func crearDisco(size int64, path, name, unit string) {
 	}
 
 	//creacion de carpetas necesarias para el almacenamiento del archivo
-	pathAux := "\"" + path + "\""
-	exec.Command("mkdir", "-p", pathAux).Output()
+	exec.Command("mkdir", "-p", path).Output()
 
 	//validacion de la existencia del archivo
-	if _, err := os.Stat(path + "/" + name); err == nil {
+	if _, err := os.Stat(path + name); err == nil {
 		fmt.Println("El archivo del disco ya existe")
 		return
 	}
 
 	//creacion del archivo de simulacion del disco
-	archivo, _ := os.Create(path + "/" + name)
+	archivo, _ := os.Create(path + name)
 	defer archivo.Close()
 
 	//obtencion de la fecha

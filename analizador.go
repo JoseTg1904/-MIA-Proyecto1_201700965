@@ -50,10 +50,13 @@ func analizarComandoPrincipal(entrada []string) {
 		case "edit":
 			analizarParametrosEdit(entrada)
 		case "ren":
+			analizarParametrosRen(entrada)
 		case "mkdir":
 			analizarParametrosMkdir(entrada)
 		case "cp":
+			//analizarParametrosCp(entrada)
 		case "mv":
+			//analizarParametrosMv(entrada)
 		case "find":
 		case "chown":
 		case "chgrp":
@@ -68,6 +71,66 @@ func analizarComandoPrincipal(entrada []string) {
 		}
 	} else {
 		fmt.Println("Has echo un comentario")
+	}
+}
+
+func analizarParametrosCp(entrada []string) {
+	id := "vacio"
+	path := "vacio"
+	destino := "vacio"
+
+	for i := 1; i < len(entrada); i++ {
+		aux := strings.Split(entrada[i], "->")
+		if strings.Contains(aux[0], "#") == false {
+			switch strings.ToLower(aux[0]) {
+			case "-dest":
+				destino = obtenerPath(entrada, i)
+			case "-path":
+				path = obtenerPath(entrada, i)
+			case "-id":
+				id = strings.ToLower(aux[1])
+			}
+		} else {
+			break
+		}
+	}
+
+	if id != "vacio" && path != "vacio" && destino != "vacio" {
+		copiarArchivosOCarpetas(id, path, destino)
+	} else {
+		fmt.Println("El comando ingresado no es valido")
+	}
+}
+
+func analizarParametrosMv(entrada []string) {
+
+}
+
+func analizarParametrosRen(entrada []string) {
+	id := "vacio"
+	path := "vacio"
+	name := "vacio"
+
+	for i := 1; i < len(entrada); i++ {
+		aux := strings.Split(entrada[i], "->")
+		if strings.Contains(aux[0], "#") == false {
+			switch strings.ToLower(aux[0]) {
+			case "-name":
+				name = obtenerPath(entrada, i)
+			case "-path":
+				path = obtenerPath(entrada, i)
+			case "-id":
+				id = strings.ToLower(aux[1])
+			}
+		} else {
+			break
+		}
+	}
+
+	if id != "vacio" && path != "vacio" && name != "vacio" {
+		modificarNombre(id, path, name)
+	} else {
+		fmt.Println("El comando ingresado no es valido")
 	}
 }
 
@@ -96,7 +159,7 @@ func analizarParametrosRm(entrada []string) {
 		//eliminar
 		fmt.Println(especial)
 	} else {
-		fmt.Print("\nEl comando ingresado no es valido\n\n")
+		fmt.Println("El comando ingresado no es valido")
 	}
 }
 
@@ -118,7 +181,7 @@ func analizarParametrosEdit(entrada []string) {
 				if val, _ := strconv.Atoi(aux[1]); val >= 0 {
 					size, _ = strconv.Atoi(aux[1])
 				} else {
-					fmt.Print("\nEl parametro size debe de ser igual o mayor a cero\n\n")
+					fmt.Println("El parametro size debe de ser igual o mayor a cero")
 					return
 				}
 			case "-cont":
@@ -132,7 +195,7 @@ func analizarParametrosEdit(entrada []string) {
 	if id != "vacio" && path != "vacio" {
 		modificarContenidoArchivo(id, path, cont, int64(size))
 	} else {
-		fmt.Print("\nEl comando ingresado no es valido\n\n")
+		fmt.Println("El comando ingresado no es valido")
 	}
 }
 
@@ -185,7 +248,7 @@ func analizarParametrosRmusr(entrada []string) {
 	if id != "vacio" && usr != "vacio" {
 		eliminarUsuario(id, usr)
 	} else {
-		fmt.Print("\nEl comando ingresado no es valido\n\n")
+		fmt.Println("El comando ingresado no es valido")
 	}
 }
 
@@ -216,7 +279,7 @@ func analizarParametrosMkusr(entrada []string) {
 	if id != "vacio" && usr != "vacio" && pwd != "vacio" && grp != "vacio" {
 		crearUsuario(id, usr, pwd, grp)
 	} else {
-		fmt.Print("\nEl comando ingresado no es valido\n\n")
+		fmt.Println("El comando ingresado no es valido")
 	}
 }
 
@@ -238,7 +301,7 @@ func analizarParametrosLoss(entrada []string) {
 	if id != "vacio" {
 		simulacionPerdida(id)
 	} else {
-		fmt.Print("\nEl comando ingresado no es valido\n\n")
+		fmt.Println("El comando ingresado no es valido")
 	}
 }
 
@@ -260,7 +323,7 @@ func analizarParametrosRecovery(entrada []string) {
 	if id != "vacio" {
 		recuperarSistema(id)
 	} else {
-		fmt.Print("\nEl comando ingresado no es valido\n\n")
+		fmt.Println("El comando ingresado no es valido")
 	}
 }
 
@@ -285,7 +348,7 @@ func analizarParametrosMkfile(entrada []string) {
 				if val, _ := strconv.Atoi(aux[1]); val >= 0 {
 					size, _ = strconv.Atoi(aux[1])
 				} else {
-					fmt.Print("\nEl parametro size debe de ser igual o mayor a cero\n\n")
+					fmt.Println("El parametro size debe de ser igual o mayor a cero")
 					return
 				}
 			case "-cont":
@@ -299,7 +362,7 @@ func analizarParametrosMkfile(entrada []string) {
 	if id != "vacio" && path != "vacio" {
 		crearArchivo(id, especial, path, cont, int64(size), 1)
 	} else {
-		fmt.Print("\nEl comando ingresado no es valido\n\n")
+		fmt.Println("El comando ingresado no es valido")
 	}
 }
 
@@ -320,6 +383,10 @@ func analizarParametrosRep(entrada []string) {
 			case "-id":
 				id = strings.ToLower(aux[1])
 			case "-nombre":
+				if val := strings.ToLower(aux[1]); val == "mbr" || val == "disk" || val == "sb" || val == "bm_arbdir" || val == "bm_detdir" || val == "bm_inode" || val == "bm_block" || val == "bitacora" || val == "directorio" || val == "tree_file" || val == "tree_directorio" || val == "tree_complete" || val == "ls" {
+					nombre = val
+				}
+			case "-name":
 				if val := strings.ToLower(aux[1]); val == "mbr" || val == "disk" || val == "sb" || val == "bm_arbdir" || val == "bm_detdir" || val == "bm_inode" || val == "bm_block" || val == "bitacora" || val == "directorio" || val == "tree_file" || val == "tree_directorio" || val == "tree_complete" || val == "ls" {
 					nombre = val
 				}
@@ -385,7 +452,7 @@ func analizarParametrosMkgrp(entrada []string) {
 	if id != "vacio" && name != "vacio" {
 		crearGrupo(id, name)
 	} else {
-		fmt.Print("\nEl comando ingresado no es valido\n\n")
+		fmt.Println("El comando ingresado no es valido")
 	}
 }
 
@@ -410,7 +477,7 @@ func analizarParametrosRmgrp(entrada []string) {
 	if id != "vacio" && name != "vacio" {
 		eliminarGrupo(id, name)
 	} else {
-		fmt.Print("\nEl comando ingresado no es valido\n\n")
+		fmt.Println("El comando ingresado no es valido")
 	}
 }
 
@@ -438,7 +505,7 @@ func analizarParametrosLogin(entrada []string) {
 	if id != "vacio" && pwd != "vacio" && usr != "vacio" {
 		iniciarSesion(id, usr, pwd)
 	} else {
-		fmt.Print("\nEl comando ingresado no es valido\n\n")
+		fmt.Println("El comando ingresado no es valido")
 	}
 }
 
@@ -678,7 +745,12 @@ func obtenerPath(entrada []string, posicion int) string {
 		val = strings.ReplaceAll(val, "\n", "")
 		return val
 	} else if val := path1[1]; string(val[0]) == "\"" {
-		val += " " + entrada[posicion+1]
+		for i := posicion + 1; i < len(entrada); i++ {
+			val += " " + entrada[i]
+			if strings.Contains(entrada[i], "\"") {
+				break
+			}
+		}
 		val = strings.ReplaceAll(val, "\"", "")
 		val = strings.ReplaceAll(val, "\n", "")
 		return val

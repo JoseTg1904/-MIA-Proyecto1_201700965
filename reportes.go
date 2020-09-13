@@ -163,7 +163,6 @@ func reporteTreeDirectorio(id, path, ruta string) {
 
 	division := strings.Split(ruta, "/")
 	for i := 0; i < len(division); i++ {
-		fmt.Println(i, "valor", division[i])
 		if i == len(division)-1 {
 			recorrerAVDDirectorio(disco, int64(super.InicioAVD), apuntadorEstructuraAVD, apuntadorBit, "", true)
 		} else {
@@ -459,6 +458,7 @@ func reporteTreeComplete(id, path string) {
 	recorrerAVD(disco, int64(sb.InicioAVD), int64(sb.InicioAVD), 0)
 	dotSalida += "}"
 
+	fmt.Println("ya sali")
 	pathSinComillas := strings.ReplaceAll(path, "\"", "")
 	aux := strings.Split(pathSinComillas, ".")
 	pathDot := aux[0] + ".dot"
