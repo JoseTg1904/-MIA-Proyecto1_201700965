@@ -721,7 +721,7 @@ func analizarParametrosMkdisk(entrada []string) {
 				path = obtenerPath(entrada, i)
 			case "-name":
 				if val := strings.ToLower(aux[1]); strings.HasSuffix(val, ".dsk") {
-					name = aux[1]
+					name = obtenerPath(entrada, i)
 				}
 			case "-unit":
 				if val := strings.ToLower(aux[1]); val == "k" || val == "m" {

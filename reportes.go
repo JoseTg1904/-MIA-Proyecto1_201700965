@@ -666,7 +666,6 @@ func reporteMBR(id, path string) {
 	archivoSalida, _ := os.Create(pathDot)
 	archivoSalida.WriteString(dot)
 	archivoSalida.Close()
-
 	exec.Command("dot", pathDot, "-Tpng", "-o", pathImagen).Output()
 	fmt.Println("\033[1;32mSe a generado el reporte\033[0m")
 }
@@ -745,6 +744,7 @@ func reporteDisk(id, path string) {
 
 	disco.Close()
 	pathSinComillas := strings.ReplaceAll(path, "\"", "")
+	exec.Command("mkdir", "-p", pathSinComillas)
 	aux := strings.Split(pathSinComillas, ".")
 	pathDot := aux[0] + ".dot"
 	pathImagen := aux[0] + ".png"
