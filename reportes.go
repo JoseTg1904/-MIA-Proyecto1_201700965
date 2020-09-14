@@ -37,12 +37,84 @@ func desicionReporte(id, path, ruta, nombre string) {
 	case "directorio":
 		reporteDirectorio(id, path)
 	case "tree_file":
+		if ruta == "vacio" {
+			fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
+			return
+		}
 		reporteTreeFile(id, path, ruta)
 	case "tree_directorio":
+		if ruta == "vacio" {
+			fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
+			return
+		}
 		reporteTreeDirectorio(id, path, ruta)
 	case "tree_complete":
 		reporteTreeComplete(id, path)
 	case "ls":
+		reporteLs(id, ruta)
+	}
+}
+
+func reporteLs(id, path string) {
+	disco, _, inicio := obtenerDiscoMontado(id)
+
+	if disco == nil {
+		fmt.Println("El disco no se encuentra montado")
+		return
+	}
+
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		reporteVacio(id, path, 1)
+		return
+	}
+
+	super = obtenerSuperBoot(disco, int64(inicio))
+
+	dotSalida = ""
+	apuntadorBit = 0
+	apuntadorEstructuraDD = -1
+
+	division := strings.Split(path, "/")
+	posicionActualAVD = int64(super.InicioAVD)
+	for i := 1; i < len(division); i++ {
+		verificarExistenciaAVD(disco, posicionActualAVD, division[i], 0)
+	}
+
+	dotSalida += "\033[1;33m"
+	dotSalida += "Permisos | Usuario | Grupo | Creacion | Modificacion | Nombre\n"
+	recorrerAVDLs(disco, posicionActualAVD)
+	dotSalida += "\033[0m"
+	fmt.Println(dotSalida)
+}
+
+func recorrerAVDLs(disco *os.File, posicionAVD int64) {
+	avdAux := obtenerAVD(disco, posicionAVD)
+	dotSalida += retornarStringLimpio(avdAux.Permisos[:]) + " | " + retornarStringLimpio(avdAux.Propietario[:]) + " | " + retornarStringLimpio(avdAux.IDGrupo[:]) + " | " + retornarStringLimpio(avdAux.Creacion[:]) + " | " + retornarStringLimpio(avdAux.Creacion[:]) + " | " + retornarStringLimpio(avdAux.Nombre[:]) + "\n"
+	for i := 0; i < 6; i++ {
+		if avdAux.SubDirectorios[i] != -1 {
+			recorrerAVDLs(disco, avdAux.SubDirectorios[i])
+		}
+	}
+	if avdAux.ApuntadoExtraAVD != -1 {
+		recorrerAVDLs(disco, avdAux.ApuntadoExtraAVD)
+	}
+	if avdAux.ApuntadorDD != -1 {
+		recorrerDDLs(disco, avdAux.ApuntadorDD)
+	}
+}
+
+func recorrerDDLs(disco *os.File, posicionDD int64) {
+	ddAux := obtenerDD(disco, posicionDD)
+	for i := 0; i < 5; i++ {
+		if ddAux.ArregloArchivos[i].ApuntadorINodo != -1 {
+			inodoAux := obtenerInodo(disco, ddAux.ArregloArchivos[i].ApuntadorINodo)
+			dotSalida += retornarStringLimpio(inodoAux.Permiso[:]) + " | " + retornarStringLimpio(inodoAux.Propietario[:]) + " | " + retornarStringLimpio(inodoAux.IDGrupo[:]) + " | " + retornarStringLimpio(ddAux.ArregloArchivos[i].Creacion[:]) + " | " + retornarStringLimpio(ddAux.ArregloArchivos[i].Creacion[:]) + " | " + retornarStringLimpio(ddAux.ArregloArchivos[i].NombreArchivo[:]) + "\n"
+		}
+	}
+	if ddAux.ApuntadorExtraDD != -1 {
+		recorrerDDLs(disco, ddAux.ApuntadorExtraDD)
 	}
 }
 

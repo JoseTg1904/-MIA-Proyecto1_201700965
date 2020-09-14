@@ -54,7 +54,6 @@ func analizarComandoPrincipal(entrada []string) {
 		case "mkdir":
 			analizarParametrosMkdir(entrada)
 		case "cp":
-			//analizarParametrosCp(entrada)
 		case "mv":
 			analizarParametrosMv(entrada)
 		case "find":
@@ -72,35 +71,6 @@ func analizarComandoPrincipal(entrada []string) {
 	}
 }
 
-/*
-func analizarParametrosCp(entrada []string) {
-	id := "vacio"
-	path := "vacio"
-	destino := "vacio"
-
-	for i := 1; i < len(entrada); i++ {
-		aux := strings.Split(entrada[i], "->")
-		if strings.Contains(aux[0], "#") == false {
-			switch strings.ToLower(aux[0]) {
-			case "-dest":
-				destino = obtenerPath(entrada, i)
-			case "-path":
-				path = obtenerPath(entrada, i)
-			case "-id":
-				id = strings.ToLower(aux[1])
-			}
-		} else {
-			break
-		}
-	}
-
-	if id != "vacio" && path != "vacio" && destino != "vacio" {
-		copiarArchivosOCarpetas(id, path, destino)
-	} else {
-		fmt.Println("El comando ingresado no es valido")
-	}
-}
-*/
 func analizarParametrosMv(entrada []string) {
 	id := "vacio"
 	path := "vacio"
@@ -419,8 +389,21 @@ func analizarParametrosRep(entrada []string) {
 		}
 	}
 
-	if id != "vacio" && path != "vacio" && nombre != "vacio" {
-		desicionReporte(id, path, ruta, nombre)
+	if id != "vacio" && nombre != "vacio" {
+		if nombre == "ls" {
+			if ruta != "vacio" {
+				desicionReporte(id, path, ruta, nombre)
+			} else {
+				fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
+			}
+		} else {
+			if path != "vacio" {
+				desicionReporte(id, path, ruta, nombre)
+			} else {
+				fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
+			}
+		}
+
 	} else {
 		fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
 	}

@@ -2069,126 +2069,6 @@ func modificarNombre(id, path, name string) {
 	}
 }
 
-/*
-func copiarArchivosOCarpetas(id, path, dest string) {
-	disco, _, inicio := obtenerDiscoMontado(id)
-
-	if disco == nil {
-		return
-	}
-
-	estado, _ := obtenerEstadoPerdida(id)
-
-	if estado {
-		fmt.Println("\033[1;31mLa particion presento una perdida\033[0m")
-		return
-	}
-
-	super = obtenerSuperBoot(disco, int64(inicio))
-
-	posicionActualAVD = int64(super.InicioAVD)
-
-	banderaSinCrear := false
-
-	listado := strings.Split(path, "/")
-
-	if strings.Contains(listado[len(listado)-1], ".") {
-		//se va a copiar el archivo
-		for i := 1; i < len(listado)-1; i++ {
-			verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 0)
-			if existenciaAVD == false {
-				if i != len(listado)-1 {
-					banderaSinCrear = true
-					break
-				}
-			}
-		}
-
-		if banderaSinCrear {
-			fmt.Println("Una de las carpetas padre aun no se encuentra creada")
-			return
-		}
-
-		avdAux := obtenerAVD(disco, posicionActualAVD)
-
-		if avdAux.ApuntadorDD == -1 {
-			fmt.Println("La carpeta no tiene archivos")
-			return
-		}
-
-		contenidoArchivo = ""
-
-		busquedaArchivoDD(disco, avdAux.ApuntadorDD, listado[len(listado)-1])
-
-		if posicionActualInodo == 0 {
-			fmt.Println("El archivo no existe en la carpeta")
-			return
-		}
-
-		busquedaArchivoInodo(disco, posicionActualInodo)
-
-		crearArchivo(id, "vacio", dest+"/"+listado[len(listado)-1], contenidoArchivo, int64(len(contenidoArchivo)), 1)
-
-		fmt.Println("Se a copiado el archivo exitosamente")
-	} else {
-		/*for i := 1; i < len(listado); i++ {
-			verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 0)
-			if existenciaAVD == false {
-				banderaSinCrear = true
-				break
-			}
-		}
-
-		if banderaSinCrear {
-			fmt.Println("Una de las carpetas padre aun no se encuentra creada")
-			return
-		}
-
-		i := 0
-		nombreAux := [20]byte{}
-		copy(nombreAux[:], listado[len(listado)-1])
-		banderaEncontrado := false
-		posicionAVD := posicionActualAVD
-		for {
-			avdAux := obtenerAVD(disco, posicionActualAVD)
-			for i = 0; i < 6; i++ {
-				if avdAux.SubDirectorios[i] != -1 {
-					avdInterno := obtenerAVD(disco, avdAux.SubDirectorios[i])
-					if avdInterno.Nombre == nombreAux {
-						banderaEncontrado = true
-						break
-					}
-				}
-			}
-
-			if banderaEncontrado == false {
-				if avdAux.ApuntadoExtraAVD != -1 {
-					posicionAVD = avdAux.ApuntadoExtraAVD
-				} else {
-					break
-				}
-			} else {
-				break
-			}
-		}
-
-		if banderaEncontrado == false {
-			fmt.Println("La carpeta a copiar no se encuentra en la ruta especificada")
-			return
-		}
-		/*avdAux := obtenerAVD(disco, posicionActualAVD)
-		avdAux.Nombre = nombreLimpio
-		copy(avdAux.Nombre[:], name)
-
-		escribirAVD(disco, posicionActualAVD, avdAux)
-
-		agregarLog(disco, "ren", "1", path, name, 1)
-		disco.Close()
-		fmt.Println("Se a modificado el nombre de la carpeta exitosamente")
-*/
-/*}
-}*/
-
 func eliminarArchivosOCarpetas(id, path, especial string) {
 	disco, _, inicio := obtenerDiscoMontado(id)
 
@@ -2418,6 +2298,7 @@ func moverArchivoYCarpetas(id, path, destino string) {
 						internoLimpio := estructuraInterndaDD{ApuntadorINodo: -1}
 						copy(internoLimpio.NombreArchivo[:], "")
 						ddAux.ArregloArchivos[i] = internoLimpio
+						escribirDD(disco, posicionDD, ddAux)
 						break
 					}
 				}
