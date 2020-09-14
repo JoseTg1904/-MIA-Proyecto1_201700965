@@ -75,24 +75,16 @@ func reporteBitacora(id, path string) {
 		disco.Seek(posicionActual, 0)
 		bitacoraVacia := bitacora{}
 		contenido := make([]byte, int(unsafe.Sizeof(bitacora{})))
-		_, err := disco.Read(contenido)
-		if err != nil {
-		}
+		disco.Read(contenido)
 		buffer := bytes.NewBuffer(contenido)
-		a := binary.Read(buffer, binary.BigEndian, &bitacoraVacia)
-		if a != nil {
-		}
+		binary.Read(buffer, binary.BigEndian, &bitacoraVacia)
 		if bitacoraVacia.Tamanio != -1 {
 			disco.Seek(posicionActual, 0)
 			bitacoraAux := bitacora{}
 			contenidoBitacora := make([]byte, int64(unsafe.Sizeof(bitacoraAux)))
-			_, err := disco.Read(contenidoBitacora)
-			if err != nil {
-			}
+			disco.Read(contenidoBitacora)
 			bufferBitacora := bytes.NewBuffer(contenidoBitacora)
-			a := binary.Read(bufferBitacora, binary.BigEndian, &bitacoraAux)
-			if a != nil {
-			}
+			binary.Read(bufferBitacora, binary.BigEndian, &bitacoraAux)
 			dotAux := strconv.Itoa(int(bitAux)) + " [shape=\"plaintext\" label= <<table>\n"
 			dotAux += "<tr><td colspan=\"6\"> Instruccion " + strconv.Itoa(int(bitAux)) + " </td></tr>"
 			dotAux += "<tr><td>Tipo de operacion</td><td>Elemento insertado</td><td>Path</td><td>Contenido</td><td>Fecha</td><td>Tamaño</td></tr>\n"
@@ -135,7 +127,7 @@ func reporteBitacora(id, path string) {
 	archivoSalida.Close()
 
 	exec.Command("dot", pathDot, "-Tpng", "-o", pathImagen).Output()
-
+	fmt.Println("\033[1;32mSe a generado el reporte\033[0m")
 }
 
 func reporteTreeDirectorio(id, path, ruta string) {
@@ -183,6 +175,7 @@ func reporteTreeDirectorio(id, path, ruta string) {
 	archivoSalida.Close()
 
 	exec.Command("dot", pathDot, "-Tpng", "-o", pathImagen).Output()
+	fmt.Println("\033[1;32mSe a generado el reporte\033[0m")
 }
 
 func reporteTreeFile(id, path, ruta string) {
@@ -230,20 +223,12 @@ func reporteTreeFile(id, path, ruta string) {
 	archivoSalida.Close()
 
 	exec.Command("dot", pathDot, "-Tpng", "-o", pathImagen).Output()
+	fmt.Println("\033[1;32mSe a generado el reporte\033[0m")
 }
 
 func recorrerAVDFile(disco *os.File, inicioAvd, posicionActualAVD, bitActual int64, carpetaHijo string, ultimo bool) {
-	disco.Seek(posicionActualAVD, 0)
 
-	avdAux := avd{}
-	contenido := make([]byte, int(unsafe.Sizeof(avdAux)))
-	_, err := disco.Read(contenido)
-	if err != nil {
-	}
-	buffer := bytes.NewBuffer(contenido)
-	a := binary.Read(buffer, binary.BigEndian, &avdAux)
-	if a != nil {
-	}
+	avdAux := obtenerAVD(disco, posicionActualAVD)
 
 	dotSalida += "AVD" + strconv.Itoa(int(bitActual)) + " [shape=\"plaintext\" label= <<table>\n"
 	dotSalida += "<tr><td colspan=\"8\">" + retornarStringLimpio(avdAux.Nombre[:]) + "</td></tr>"
@@ -259,28 +244,28 @@ func recorrerAVDFile(disco *os.File, inicioAvd, posicionActualAVD, bitActual int
 	dotSalida += "</tr>\n"
 	dotSalida += "</table>>]\n"
 
+	banderaEncontrado := false
 	for i := 0; i < 6; i++ {
 		if avdAux.SubDirectorios[i] != -1 {
-			avdInerno := avd{}
-			disco.Seek(avdAux.SubDirectorios[i], 0)
-			content := make([]byte, int(unsafe.Sizeof(avdInerno)))
-			_, err := disco.Read(content)
-			if err != nil {
-			}
-			bufferInterno := bytes.NewBuffer(content)
-			a := binary.Read(bufferInterno, binary.BigEndian, &avdInerno)
-			if a != nil {
-			}
+			avdInterno := obtenerAVD(disco, avdAux.SubDirectorios[i])
 			name := [20]byte{}
 			copy(name[:], carpetaHijo)
 			if carpetaHijo != "" {
-				if avdInerno.Nombre == name {
+				if avdInterno.Nombre == name {
 					apuntadorBit = (avdAux.SubDirectorios[i] - inicioAvd) / int64(unsafe.Sizeof(avd{}))
 					dotSalida += "AVD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(i) + " -> " + " AVD" + strconv.Itoa(int(apuntadorBit)) + "\n"
 					apuntadorEstructuraAVD = avdAux.SubDirectorios[i]
+					banderaEncontrado = true
 					break
 				}
 			}
+		}
+	}
+	if banderaEncontrado == false {
+		if avdAux.ApuntadoExtraAVD != -1 {
+			apuntadorBit = (avdAux.ApuntadoExtraAVD - inicioAvd) / int64(unsafe.Sizeof(avd{}))
+			dotSalida += "AVD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(7) + " -> " + " AVD" + strconv.Itoa(int(apuntadorBit)) + "\n"
+			recorrerAVDFile(disco, inicioAvd, avdAux.ApuntadoExtraAVD, apuntadorBit, carpetaHijo, ultimo)
 		}
 	}
 	if ultimo == true {
@@ -293,18 +278,8 @@ func recorrerAVDFile(disco *os.File, inicioAvd, posicionActualAVD, bitActual int
 }
 
 func recorrerDDFiles(disco *os.File, posicionActualDD, bitActual int64, archivo string) {
-	disco.Seek(posicionActualDD, 0)
 
-	ddAux := detalleDirectorio{}
-
-	contenido := make([]byte, int(unsafe.Sizeof(ddAux)))
-	_, err := disco.Read(contenido)
-	if err != nil {
-	}
-	buffer := bytes.NewBuffer(contenido)
-	a := binary.Read(buffer, binary.BigEndian, &ddAux)
-	if a != nil {
-	}
+	ddAux := obtenerDD(disco, posicionActualDD)
 
 	banderaEncontrado := false
 
@@ -326,7 +301,7 @@ func recorrerDDFiles(disco *os.File, posicionActualDD, bitActual int64, archivo 
 			copy(name[:], archivo)
 			if ddAux.ArregloArchivos[i].NombreArchivo == name {
 				apuntadorBit = (ddAux.ArregloArchivos[i].ApuntadorINodo - int64(super.InicioINodo)) / int64(unsafe.Sizeof(iNodo{}))
-				dotSalida += "DD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(5) + " -> " + " INodo" + strconv.Itoa(int(apuntadorBit)) + "\n"
+				dotSalida += "DD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(i) + " -> " + " INodo" + strconv.Itoa(int(apuntadorBit)) + "\n"
 				recorrerINodo(disco, ddAux.ArregloArchivos[i].ApuntadorINodo, apuntadorBit)
 				banderaEncontrado = true
 				break
@@ -344,18 +319,8 @@ func recorrerDDFiles(disco *os.File, posicionActualDD, bitActual int64, archivo 
 }
 
 func recorrerDDFile(disco *os.File, posicionActualDD, bitActual int64) {
-	disco.Seek(posicionActualDD, 0)
 
-	ddAux := detalleDirectorio{}
-
-	contenido := make([]byte, int(unsafe.Sizeof(ddAux)))
-	_, err := disco.Read(contenido)
-	if err != nil {
-	}
-	buffer := bytes.NewBuffer(contenido)
-	a := binary.Read(buffer, binary.BigEndian, &ddAux)
-	if a != nil {
-	}
+	ddAux := obtenerDD(disco, posicionActualDD)
 
 	dotSalida += "DD" + strconv.Itoa(int(bitActual)) + " [shape=\"plaintext\" label= <<table>\n"
 	dotSalida += "<tr><td>Detalle de directorio</td></tr>"
@@ -377,17 +342,8 @@ func recorrerDDFile(disco *os.File, posicionActualDD, bitActual int64) {
 }
 
 func recorrerAVDDirectorio(disco *os.File, inicioAvd, posicionActualAVD, bitActual int64, carpetaHijo string, ultimo bool) {
-	disco.Seek(posicionActualAVD, 0)
 
-	avdAux := avd{}
-	contenido := make([]byte, int(unsafe.Sizeof(avdAux)))
-	_, err := disco.Read(contenido)
-	if err != nil {
-	}
-	buffer := bytes.NewBuffer(contenido)
-	a := binary.Read(buffer, binary.BigEndian, &avdAux)
-	if a != nil {
-	}
+	avdAux := obtenerAVD(disco, posicionActualAVD)
 
 	dotSalida += "AVD" + strconv.Itoa(int(bitActual)) + " [shape=\"plaintext\" label= <<table>\n"
 	dotSalida += "<tr><td colspan=\"8\">" + retornarStringLimpio(avdAux.Nombre[:]) + "</td></tr>"
@@ -403,18 +359,11 @@ func recorrerAVDDirectorio(disco *os.File, inicioAvd, posicionActualAVD, bitActu
 	dotSalida += "</tr>\n"
 	dotSalida += "</table>>]\n"
 
+	banderaEncontrado := false
+
 	for i := 0; i < 6; i++ {
 		if avdAux.SubDirectorios[i] != -1 {
-			avdInerno := avd{}
-			disco.Seek(avdAux.SubDirectorios[i], 0)
-			content := make([]byte, int(unsafe.Sizeof(avdInerno)))
-			_, err := disco.Read(content)
-			if err != nil {
-			}
-			bufferInterno := bytes.NewBuffer(content)
-			a := binary.Read(bufferInterno, binary.BigEndian, &avdInerno)
-			if a != nil {
-			}
+			avdInerno := obtenerAVD(disco, avdAux.SubDirectorios[i])
 			name := [20]byte{}
 			copy(name[:], carpetaHijo)
 			if carpetaHijo != "" {
@@ -422,9 +371,17 @@ func recorrerAVDDirectorio(disco *os.File, inicioAvd, posicionActualAVD, bitActu
 					apuntadorBit = (avdAux.SubDirectorios[i] - inicioAvd) / int64(unsafe.Sizeof(avd{}))
 					dotSalida += "AVD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(i) + " -> " + " AVD" + strconv.Itoa(int(apuntadorBit)) + "\n"
 					apuntadorEstructuraAVD = avdAux.SubDirectorios[i]
+					banderaEncontrado = true
 					break
 				}
 			}
+		}
+	}
+	if banderaEncontrado == false {
+		if avdAux.ApuntadoExtraAVD != -1 {
+			apuntadorBit = (avdAux.ApuntadoExtraAVD - inicioAvd) / int64(unsafe.Sizeof(avd{}))
+			dotSalida += "AVD" + strconv.Itoa(int(bitActual)) + ":" + strconv.Itoa(7) + " -> " + " AVD" + strconv.Itoa(int(apuntadorBit)) + "\n"
+			recorrerAVDDirectorio(disco, inicioAvd, avdAux.ApuntadoExtraAVD, apuntadorBit, carpetaHijo, ultimo)
 		}
 	}
 	if ultimo == true {
@@ -458,7 +415,6 @@ func reporteTreeComplete(id, path string) {
 	recorrerAVD(disco, int64(sb.InicioAVD), int64(sb.InicioAVD), 0)
 	dotSalida += "}"
 
-	fmt.Println("ya sali")
 	pathSinComillas := strings.ReplaceAll(path, "\"", "")
 	aux := strings.Split(pathSinComillas, ".")
 	pathDot := aux[0] + ".dot"
@@ -468,40 +424,18 @@ func reporteTreeComplete(id, path string) {
 	archivoSalida.Close()
 
 	exec.Command("dot", pathDot, "-Tpng", "-o", pathImagen).Output()
+	fmt.Println("\033[1;32mSe a generado el reporte\033[0m")
 }
 
 func recorrerBloques(disco *os.File, posicionActualBLoque, bitActual int64) {
-	disco.Seek(posicionActualBLoque, 0)
-
-	bloqueAux := bloqueDatos{}
-
-	contenido := make([]byte, int(unsafe.Sizeof(bloqueAux)))
-	_, err := disco.Read(contenido)
-	if err != nil {
-	}
-	buffer := bytes.NewBuffer(contenido)
-	a := binary.Read(buffer, binary.BigEndian, &bloqueAux)
-	if a != nil {
-	}
-
+	bloqueAux := obtenerBloque(disco, posicionActualBLoque)
 	dotSalida += "Bloque" + strconv.Itoa(int(bitActual)) + " [shape=\"plaintext\" label= <<table>\n"
 	dotSalida += "<tr><td>" + retornarStringLimpio(bloqueAux.Contenido[:]) + "</td></tr>"
 	dotSalida += "</table>>]\n"
 }
 
 func recorrerINodo(disco *os.File, posicionActualINodo, bitActual int64) {
-	disco.Seek(posicionActualINodo, 0)
-
-	inodoAux := iNodo{}
-
-	contenido := make([]byte, int(unsafe.Sizeof(iNodo{})))
-	_, err := disco.Read(contenido)
-	if err != nil {
-	}
-	buffer := bytes.NewBuffer(contenido)
-	a := binary.Read(buffer, binary.BigEndian, &inodoAux)
-	if a != nil {
-	}
+	inodoAux := obtenerInodo(disco, posicionActualINodo)
 
 	dotSalida += "INodo" + strconv.Itoa(int(bitActual)) + " [shape=\"plaintext\" label= <<table>\n"
 	dotSalida += "<tr><td>Inodo</td></tr>"
@@ -528,18 +462,7 @@ func recorrerINodo(disco *os.File, posicionActualINodo, bitActual int64) {
 }
 
 func recorrerDD(disco *os.File, posicionActualDD, bitActual int64) {
-	disco.Seek(posicionActualDD, 0)
-
-	ddAux := detalleDirectorio{}
-
-	contenido := make([]byte, int(unsafe.Sizeof(ddAux)))
-	_, err := disco.Read(contenido)
-	if err != nil {
-	}
-	buffer := bytes.NewBuffer(contenido)
-	a := binary.Read(buffer, binary.BigEndian, &ddAux)
-	if a != nil {
-	}
+	ddAux := obtenerDD(disco, posicionActualDD)
 
 	dotSalida += "DD" + strconv.Itoa(int(bitActual)) + " [shape=\"plaintext\" label= <<table>\n"
 	dotSalida += "<tr><td>Detalle de directorio</td></tr>"
@@ -569,17 +492,7 @@ func recorrerDD(disco *os.File, posicionActualDD, bitActual int64) {
 }
 
 func recorrerAVD(disco *os.File, inicioAvd, posicionActualAVD, bitActual int64) {
-	disco.Seek(posicionActualAVD, 0)
-
-	avdAux := avd{}
-	contenido := make([]byte, int(unsafe.Sizeof(avdAux)))
-	_, err := disco.Read(contenido)
-	if err != nil {
-	}
-	buffer := bytes.NewBuffer(contenido)
-	a := binary.Read(buffer, binary.BigEndian, &avdAux)
-	if a != nil {
-	}
+	avdAux := obtenerAVD(disco, posicionActualAVD)
 
 	dotSalida += "AVD" + strconv.Itoa(int(bitActual)) + " [shape=\"plaintext\" label= <<table>\n"
 	dotSalida += "<tr><td colspan=\"8\">" + retornarStringLimpio(avdAux.Nombre[:]) + "</td></tr>"
@@ -618,7 +531,6 @@ func recorrerAVD(disco *os.File, inicioAvd, posicionActualAVD, bitActual int64) 
 }
 
 func reporteMBR(id, path string) {
-	vacia := particion{}
 
 	disco, _, _ := obtenerDiscoMontado(id)
 
@@ -635,8 +547,14 @@ func reporteMBR(id, path string) {
 	dot += "<tr><td> Fecha Creacion </td><td> " + retornarStringLimpio(mbr.Creacion[:]) + "</td></tr>\n"
 	dot += "<tr><td> Random </td><td> " + strconv.Itoa(int(mbr.Random)) + "</td></tr>\n"
 
+	contExtendida := 0
+	posicionActualEBR := int64(0)
 	for i := 0; i < 4; i++ {
-		if mbr.Particiones[i] != vacia {
+		if mbr.Particiones[i].Inicio != -1 {
+			if mbr.Particiones[i].Tipo == 'e' {
+				contExtendida++
+				posicionActualEBR = mbr.Particiones[i].Inicio
+			}
 			dot += "<tr><td> Particion" + strconv.Itoa(i+1) + "_Estado </td><td> " + string(mbr.Particiones[i].Estado) + " </td></tr>\n"
 			dot += "<tr><td> Particion" + strconv.Itoa(i+1) + "_Tipo </td><td> " + string(mbr.Particiones[i].Tipo) + " </td></tr>\n"
 			dot += "<tr><td> Particion" + strconv.Itoa(i+1) + "_Ajuste </td><td> " + retornarStringLimpio(mbr.Particiones[i].Ajuste[:]) + " </td></tr>\n"
@@ -651,6 +569,22 @@ func reporteMBR(id, path string) {
 		}
 	}
 
+	iteradorEBR := 1
+	if contExtendida == 1 {
+		for {
+			ebrAux := obtnerEBR(disco, posicionActualEBR)
+			if ebrAux.Siguiente == -1 {
+				break
+			}
+			dot += "<tr><td> Particion Logica" + strconv.Itoa(iteradorEBR) + "_Estado </td><td> " + string(ebrAux.Estado) + " </td></tr>\n"
+			dot += "<tr><td> Particion Logica" + strconv.Itoa(iteradorEBR) + "_Ajuste </td><td> " + retornarStringLimpio(ebrAux.Ajuste[:]) + " </td></tr>\n"
+			dot += "<tr><td> Particion Logica" + strconv.Itoa(iteradorEBR) + "_Inicio </td><td> " + strconv.Itoa(int(ebrAux.Inicio)) + " </td></tr>\n"
+			dot += "<tr><td> Particion Logica" + strconv.Itoa(iteradorEBR) + "_Nombre </td><td> " + retornarStringLimpio(ebrAux.Nombre[:]) + " </td></tr>\n"
+			posicionActualEBR = ebrAux.Siguiente
+			iteradorEBR++
+		}
+	}
+
 	disco.Close()
 	dot += "</table>> ]\n }"
 	pathSinComillas := strings.ReplaceAll(path, "\"", "")
@@ -662,10 +596,10 @@ func reporteMBR(id, path string) {
 	archivoSalida.Close()
 
 	exec.Command("dot", pathDot, "-Tpng", "-o", pathImagen).Output()
+	fmt.Println("\033[1;32mSe a generado el reporte\033[0m")
 }
 
 func reporteDisk(id, path string) {
-	vacia := particion{}
 
 	disco, _, _ := obtenerDiscoMontado(id)
 
@@ -685,11 +619,47 @@ func reporteDisk(id, path string) {
 	dot += "\"nombre\" [shape=\"plaintext\" label = \"" + nombre[0] + "\"]\n"
 	dot += "\"disco\" [shape=\"plaintext\" label = <<table><tr><td> MBR </td>\n"
 	for i := 0; i < 4; i++ {
-		if mbr.Particiones[i] != vacia {
+		if mbr.Particiones[i].Inicio != -1 {
 			tamañoDisponible -= float64(mbr.Particiones[i].Tamanio)
 			porcentaje := float64((float64(mbr.Particiones[i].Tamanio) * 100) / float64(mbr.Tamanio))
 			porcentajeConvertido := fmt.Sprintf("%.3f", porcentaje)
-			dot += "<td> " + retornarStringLimpio(mbr.Particiones[i].Nombre[:]) + " <br /> " + string(mbr.Particiones[i].Tipo) + "<br />" + porcentajeConvertido + "% </td>\n"
+			if mbr.Particiones[i].Tipo == 'e' {
+				dot += "<td>"
+				dot += "<table>"
+				dot += "<tr>"
+				dot += "<td "
+				posicionActualEBR := mbr.Particiones[i].Inicio
+				contadorEBR := 0
+				for {
+					ebrAux := obtnerEBR(disco, posicionActualEBR)
+					contadorEBR++
+					if ebrAux.Siguiente == -1 {
+						break
+					}
+					posicionActualEBR = ebrAux.Siguiente
+				}
+				dot += " colspan=\"" + strconv.Itoa(((contadorEBR * 2) - 1)) + "\""
+				dot += ">"
+				dot += retornarStringLimpio(mbr.Particiones[i].Nombre[:]) + " <br /> " + string(mbr.Particiones[i].Tipo) + "<br />" + porcentajeConvertido + "% </td>\n"
+				dot += "</tr>"
+				dot += "<tr>"
+				dot += "<td>EBR</td>"
+				posicionActualEBR = mbr.Particiones[i].Inicio
+				for {
+					ebrAux := obtnerEBR(disco, posicionActualEBR)
+					if ebrAux.Siguiente == -1 {
+						break
+					}
+					dot += "<td>" + retornarStringLimpio(ebrAux.Nombre[:]) + "</td>"
+					dot += "<td>EBR</td>"
+					posicionActualEBR = ebrAux.Siguiente
+				}
+				dot += "</tr>"
+				dot += "</table>"
+				dot += "</td>\n"
+			} else {
+				dot += "<td> " + retornarStringLimpio(mbr.Particiones[i].Nombre[:]) + " <br /> " + string(mbr.Particiones[i].Tipo) + "<br />" + porcentajeConvertido + "% </td>\n"
+			}
 		}
 	}
 
@@ -711,7 +681,7 @@ func reporteDisk(id, path string) {
 	archivoSalida.Close()
 
 	exec.Command("dot", pathDot, "-Tpng", "-o", pathImagen).Output()
-
+	fmt.Println("\033[1;32mSe a generado el reporte\033[0m")
 }
 
 func reporteSb(id, path string) {
@@ -776,6 +746,7 @@ func reporteSb(id, path string) {
 	archivoSalida.Close()
 
 	exec.Command("dot", pathDot, "-Tpng", "-o", pathImagen).Output()
+	fmt.Println("\033[1;32mSe a generado el reporte\033[0m")
 }
 
 func reporteBMAVD(id, path string) {
@@ -826,9 +797,12 @@ func reporteBMAVD(id, path string) {
 
 	disco.Close()
 	pathSinComillas := strings.ReplaceAll(path, "\"", "")
-	archivoSalida, _ := os.Create(pathSinComillas)
+	aux := strings.Split(pathSinComillas, ".")
+	pathSalida := aux[0] + ".txt"
+	archivoSalida, _ := os.Create(pathSalida)
 	archivoSalida.WriteString(salida)
 	archivoSalida.Close()
+	fmt.Println("\033[1;32mSe a generado el reporte\033[0m")
 }
 
 func reporteBMDD(id, path string) {
@@ -879,9 +853,12 @@ func reporteBMDD(id, path string) {
 
 	disco.Close()
 	pathSinComillas := strings.ReplaceAll(path, "\"", "")
-	archivoSalida, _ := os.Create(pathSinComillas)
+	aux := strings.Split(pathSinComillas, ".")
+	pathSalida := aux[0] + ".txt"
+	archivoSalida, _ := os.Create(pathSalida)
 	archivoSalida.WriteString(salida)
 	archivoSalida.Close()
+	fmt.Println("\033[1;32mSe a generado el reporte\033[0m")
 }
 
 func reporteBMINodos(id, path string) {
@@ -932,9 +909,12 @@ func reporteBMINodos(id, path string) {
 
 	disco.Close()
 	pathSinComillas := strings.ReplaceAll(path, "\"", "")
-	archivoSalida, _ := os.Create(pathSinComillas)
+	aux := strings.Split(pathSinComillas, ".")
+	pathSalida := aux[0] + ".txt"
+	archivoSalida, _ := os.Create(pathSalida)
 	archivoSalida.WriteString(salida)
 	archivoSalida.Close()
+	fmt.Println("\033[1;32mSe a generado el reporte\033[0m")
 }
 
 func reporteBMBloques(id, path string) {
@@ -985,9 +965,12 @@ func reporteBMBloques(id, path string) {
 
 	disco.Close()
 	pathSinComillas := strings.ReplaceAll(path, "\"", "")
-	archivoSalida, _ := os.Create(pathSinComillas)
+	aux := strings.Split(pathSinComillas, ".")
+	pathSalida := aux[0] + ".txt"
+	archivoSalida, _ := os.Create(pathSalida)
 	archivoSalida.WriteString(salida)
 	archivoSalida.Close()
+	fmt.Println("\033[1;32mSe a generado el reporte\033[0m")
 }
 
 func reporteDirectorio(id, path string) {
@@ -1022,6 +1005,7 @@ func reporteDirectorio(id, path string) {
 	archivoSalida.Close()
 
 	exec.Command("dot", pathDot, "-Tpng", "-o", pathImagen).Output()
+	fmt.Println("\033[1;32mSe a generado el reporte\033[0m")
 }
 
 func recorridoIndividualAVD(disco *os.File, inicioAvd, posicionActualAVD, bitActual int64) {
@@ -1110,14 +1094,9 @@ func reporteVacio(id, path string, tipo int) {
 	contenido := make([]byte, noEstructuras)
 
 	disco.Seek(int64(sbCopia.InicioBLoques), 0)
-	_, err := disco.Read(contenido)
-	if err != nil {
-		fmt.Println("Error en la lectura del disco")
-	}
+	disco.Read(contenido)
 	buffer := bytes.NewBuffer(contenido)
-	a := binary.Read(buffer, binary.BigEndian, &bitMap)
-	if a != nil {
-	}
+	binary.Read(buffer, binary.BigEndian, &bitMap)
 
 	contador := 1
 	salida := "| "
@@ -1145,11 +1124,15 @@ func reporteVacio(id, path string, tipo int) {
 		archivoSalida.Close()
 
 		exec.Command("dot", pathDot, "-Tpng", "-o", pathImagen).Output()
+		fmt.Println("\033[1;32mSe a generado el reporte\033[0m")
 	} else {
 		disco.Close()
 		pathSinComillas := strings.ReplaceAll(path, "\"", "")
-		archivoSalida, _ := os.Create(pathSinComillas)
+		aux := strings.Split(pathSinComillas, ".")
+		pathSalida := aux[0] + ".txt"
+		archivoSalida, _ := os.Create(pathSalida)
 		archivoSalida.WriteString(salida)
 		archivoSalida.Close()
+		fmt.Println("\033[1;32mSe a generado el reporte\033[0m")
 	}
 }

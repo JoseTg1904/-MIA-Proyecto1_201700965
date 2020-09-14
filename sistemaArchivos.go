@@ -127,7 +127,6 @@ func formateoSistema(id, tipo string) {
 	disco, tamanioParticion, inicioParticion := obtenerDiscoMontado(id)
 
 	if disco == nil {
-		fmt.Println("El disco aun no se encuentra montado")
 		return
 	}
 
@@ -220,7 +219,7 @@ func formateoSistema(id, tipo string) {
 	contenidoDefecto := "1,G,root\n1,U,root,root,201700965\n"
 	crearArchivo(id, "vacio", "/users.txt", contenidoDefecto, int64(len(contenidoDefecto)), 0)
 
-	fmt.Println("Formateo de unidad completado con exito")
+	fmt.Println("\033[1;32mFormateo de unidad completado con exito\033[0m")
 
 	disco.Close()
 }
@@ -479,7 +478,6 @@ func obtenerBitLibreBitMap(disco *os.File, inicioBitMap, noEstructuras uint32) i
 func simulacionPerdida(id string) {
 	disco, _, inicio := obtenerDiscoMontado(id)
 	if disco == nil {
-		fmt.Println("El disco aun no se encuentra montado")
 		return
 	}
 
@@ -497,7 +495,7 @@ func simulacionPerdida(id string) {
 
 	disco.Close()
 
-	fmt.Println("Se a perdido el sistema :c")
+	fmt.Println("\033[1;33mSe a perdido el sistema :C\033[0m")
 }
 
 func recuperarSistema(id string) {
@@ -505,14 +503,13 @@ func recuperarSistema(id string) {
 	disco, _, _ := obtenerDiscoMontado(id)
 
 	if disco == nil {
-		fmt.Println("El disco no se encuentra montado")
 		return
 	}
 
 	estado, inicioCopia := obtenerEstadoPerdida(id)
 
 	if estado == false {
-		fmt.Println("El sistema se encuentra funcionando correctamente")
+		fmt.Println("\033[1;32mEl sistema se encuentra funcionando correctamente c:\033[0m")
 		return
 	}
 
@@ -576,11 +573,14 @@ func recuperarSistema(id string) {
 			modificarContenidoArchivo(id, retornarStringLimpio(instrucciones[i].Path[:]), retornarStringLimpio(instrucciones[i].Contenido[:]), int64(instrucciones[i].Tamanio))
 		case "ren":
 			modificarNombre(id, retornarStringLimpio(instrucciones[i].Path[:]), retornarStringLimpio(instrucciones[i].Contenido[:]))
+		case "rm":
+			eliminarArchivosOCarpetas(id, retornarStringLimpio(instrucciones[i].Path[:]), "")
+		case "mv":
+			moverArchivoYCarpetas(id, retornarStringLimpio(instrucciones[i].Path[:]), retornarStringLimpio(instrucciones[i].Contenido[:]))
 		}
 	}
 
-	fmt.Println("El sistema se a recuperado exitosamente c:")
-
+	fmt.Println("\033[1;32mEl sistema se a recuperado exitosamente c:\033[0m")
 }
 
 func crearAVD(id, especial, ruta string, insercionLog int) {
@@ -589,14 +589,13 @@ func crearAVD(id, especial, ruta string, insercionLog int) {
 	disco, _, inicio := obtenerDiscoMontado(id)
 
 	if disco == nil {
-		fmt.Println("El disco aun no se encuentra montado")
 		return
 	}
 
 	estado, _ := obtenerEstadoPerdida(id)
 
 	if estado {
-		fmt.Println("La particion presento una perdida")
+		fmt.Println("\033[1;31mLa particion presento una perdida :c\033[0m")
 		return
 	}
 
@@ -617,11 +616,10 @@ func crearAVD(id, especial, ruta string, insercionLog int) {
 		}
 
 		super.BitLibreAVD = uint32(obtenerBitLibreBitMap(disco, super.InicioAVD, super.NoAVD))
-
+		fmt.Println("\033[1;32mSe han creado las carpetas\033[0m")
 		escribirSuperBoot(disco, int64(inicio), super)
 		escribirSuperBoot(disco, int64(super.InicioLog)+(int64(super.NoAVD)*int64(unsafe.Sizeof(bitacora{}))), super)
 		disco.Close()
-
 	} else {
 		for i := 1; i < len(listado); i++ {
 			verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 0)
@@ -634,18 +632,17 @@ func crearAVD(id, especial, ruta string, insercionLog int) {
 						crearAVDIndividual(disco, int64(super.InicioBitMapAVD), int64(super.InicioAVD), posicionActualAVD, obtenerBitLibreBitMap(disco, super.InicioBitMapAVD, super.NoAVD), listado[i])
 						super.NoAVDLibres--
 					} else {
-						fmt.Println("a llegado a la capacidad maxima de creacion de carpetas")
+						fmt.Println("\033[1;31mA llegado al maximo de creacion de carpetas\033[0m")
 					}
 				}
 			}
 		}
 		if banderaSinCrear {
-			fmt.Println("Una de las carpetas padre aun no se encuentra creada")
+			fmt.Println("\033[1;31mUna de las carpetas padre aun no se encuentra creada\033[0m")
 		} else {
 			agregarLog(disco, "mkdir", "1", ruta, "", 1)
-
+			fmt.Println("\033[1;32mSe han creado las carpetas\033[0m")
 			super.BitLibreAVD = uint32(obtenerBitLibreBitMap(disco, super.InicioBitMapAVD, super.NoAVD))
-
 			escribirSuperBoot(disco, int64(inicio), super)
 			escribirSuperBoot(disco, int64(super.InicioLog)+(int64(super.NoAVD)*int64(unsafe.Sizeof(bitacora{}))), super)
 			disco.Close()
@@ -684,7 +681,7 @@ func crearAVDIndividual(disco *os.File, iniciobitAVD, inicioAVDS, posicionAVDPad
 
 			crearAVDAnexo(disco, iniciobitAVD, inicioAVDS, bitHijo, carpetaAux.Nombre, nombre)
 		} else {
-			fmt.Println("a llegado al maximo de inserciones de carpetas posibles")
+			fmt.Println("\033[1;31mA llegado al maximo de instrucciones de carpetas posibles\033[0m")
 		}
 	} else {
 
@@ -739,14 +736,13 @@ func crearArchivo(id, especial, ruta, cont string, size int64, insercionLog int)
 	disco, _, inicio := obtenerDiscoMontado(id)
 
 	if disco == nil {
-		fmt.Println("El disco aun no se encuentra montado")
 		return
 	}
 
 	estado, _ := obtenerEstadoPerdida(id)
 
 	if estado {
-		fmt.Println("La particion presento una perdida")
+		fmt.Println("\033[1;31mLa particion presento una perdida :c\033[0m")
 		return
 	}
 
@@ -788,7 +784,7 @@ func crearArchivo(id, especial, ruta, cont string, size int64, insercionLog int)
 		for i := 1; i < len(listado); i++ {
 			verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 0)
 			if existenciaAVD == false {
-				fmt.Println("Alguna de las carpetas padre no existe")
+				fmt.Println("\033[1;31mAlguna de las carpeatas padre no existe\033[0m")
 				return
 			}
 		}
@@ -802,7 +798,7 @@ func crearArchivo(id, especial, ruta, cont string, size int64, insercionLog int)
 		ddAux.ApuntadorExtraDD = -1
 
 		if super.NoDDLibres == 0 {
-			fmt.Println("Ya no se pueden crear mas detalles de directorio")
+			fmt.Println("\033[1;31mYa no se pueden crear mas detalles de directorio\033[0m")
 			disco.Close()
 			return
 		}
@@ -833,13 +829,13 @@ func crearArchivo(id, especial, ruta, cont string, size int64, insercionLog int)
 		}
 
 		if super.NoINodosLibres < uint32(noInodosNecesarios) {
-			fmt.Println("No pueden crearse los inodos necesarios")
+			fmt.Println("\033[1;31mNo pueden crearse los inodos necesarios\033[0m")
 			disco.Close()
 			return
 		}
 
 		if super.NoBloquesLibres < uint32(noBloquesNecesarios) {
-			fmt.Println("No pueden crearse los bloques necesarios")
+			fmt.Println("\033[1;31mNo pueden crearse los bloques necesarios\033[0m")
 			disco.Close()
 			return
 		}
@@ -939,7 +935,7 @@ func crearArchivo(id, especial, ruta, cont string, size int64, insercionLog int)
 		}
 
 		disco.Close()
-		fmt.Println("Se a creado el archivo exitosamente")
+		fmt.Println("\033[1;32mSe a creado el archivo exitosamente\033[0m")
 	} else {
 		banderaDDAnexo := false
 		posicionDD := avdAux.ApuntadorDD
@@ -975,11 +971,6 @@ func crearArchivo(id, especial, ruta, cont string, size int64, insercionLog int)
 
 			banderaDisponible := false
 
-			/*if super.NoDDLibres == 0 {
-				fmt.Println("Ya no se pueden crear mas detalles de directorio")
-				return
-			}*/
-
 			i = 0
 			for i = 0; i < 5; i++ {
 				if ddAux.ArregloArchivos[i].ApuntadorINodo == -1 {
@@ -1014,7 +1005,7 @@ func crearArchivo(id, especial, ruta, cont string, size int64, insercionLog int)
 						super.NoDDLibres--
 						break
 					} else {
-						fmt.Println("No se pueden crear mas detalles de directorio")
+						fmt.Println("\033[1;31mNo se pueden crear mas detalles de directorio\033[0m")
 						return
 					}
 				}
@@ -1066,13 +1057,13 @@ func crearArchivo(id, especial, ruta, cont string, size int64, insercionLog int)
 		}
 
 		if super.NoINodosLibres < uint32(noInodosNecesarios) {
-			fmt.Println("No pueden crearse los inodos necesarios")
+			fmt.Println("\033[1;31mNo pueden crearse los inodos necesarios\033[0m")
 			disco.Close()
 			return
 		}
 
 		if super.NoBloquesLibres < uint32(noBloquesNecesarios) {
-			fmt.Println("No pueden crearse los bloques necesarios")
+			fmt.Println("\033[1;31mNo pueden crearse los bloques necesarios\033[0m")
 			disco.Close()
 			return
 		}
@@ -1163,9 +1154,64 @@ func crearArchivo(id, especial, ruta, cont string, size int64, insercionLog int)
 		}
 
 		disco.Close()
-
-		fmt.Println("Se a creado el archivo exitosamente")
+		fmt.Println("\033[1;32mSe a creado el archivo exitosamente\033[0m")
 	}
+}
+
+func borrarAVD(disco *os.File, posicionAVD int64) {
+	bitAVD := (posicionAVD - int64(super.InicioAVD)) / int64(unsafe.Sizeof(avd{}))
+
+	escribirEnBitMap(disco, 0, int64(super.InicioBitMapAVD)+bitAVD)
+
+	avdAux := obtenerAVD(disco, posicionAVD)
+
+	if avdAux.ApuntadoExtraAVD != -1 {
+		borrarAVD(disco, avdAux.ApuntadoExtraAVD)
+	}
+
+	for i := 0; i < 6; i++ {
+		if avdAux.SubDirectorios[i] != -1 {
+			borrarAVD(disco, avdAux.SubDirectorios[i])
+		}
+	}
+
+	if avdAux.ApuntadorDD != -1 {
+		borrarDD(disco, avdAux.ApuntadorDD)
+	}
+
+	disco.Seek(posicionAVD, 0)
+	bufferCeros := bytes.NewBuffer([]byte{})
+	binary.Write(bufferCeros, binary.BigEndian, uint8(0))
+	for i := 0; i < int(unsafe.Sizeof(avd{})); i++ {
+		disco.Write(bufferCeros.Bytes())
+	}
+	super.NoAVDLibres++
+}
+
+func borrarDD(disco *os.File, posicionDD int64) {
+	bitDD := (posicionDD - int64(super.InicioDD)) / int64(unsafe.Sizeof(detalleDirectorio{}))
+
+	escribirEnBitMap(disco, 0, int64(super.InicioBitMapDD)+bitDD)
+
+	ddAux := obtenerDD(disco, posicionDD)
+
+	if ddAux.ApuntadorExtraDD != -1 {
+		borrarDD(disco, ddAux.ApuntadorExtraDD)
+	}
+
+	for i := 0; i < 5; i++ {
+		if ddAux.ArregloArchivos[i].ApuntadorINodo != -1 {
+			borrarInodos(disco, ddAux.ArregloArchivos[i].ApuntadorINodo)
+		}
+	}
+
+	disco.Seek(posicionDD, 0)
+	bufferCeros := bytes.NewBuffer([]byte{})
+	binary.Write(bufferCeros, binary.BigEndian, uint8(0))
+	for i := 0; i < int(unsafe.Sizeof(detalleDirectorio{})); i++ {
+		disco.Write(bufferCeros.Bytes())
+	}
+	super.NoDDLibres++
 }
 
 func borrarInodos(disco *os.File, posicionINodo int64) {
@@ -1221,14 +1267,9 @@ func agregarLog(disco *os.File, operacion, tipo, path, contenido string, size in
 		disco.Seek(posicionLog, 0)
 		logAux := bitacora{}
 		content := make([]byte, int(unsafe.Sizeof(bitacora{})))
-		_, err := disco.Read(content)
-		if err != nil {
-			fmt.Println("Error en la lectura del disco")
-		}
+		disco.Read(content)
 		buffer := bytes.NewBuffer(content)
-		a := binary.Read(buffer, binary.BigEndian, &logAux)
-		if a != nil {
-		}
+		binary.Read(buffer, binary.BigEndian, &logAux)
 		if logAux.Tamanio == -1 {
 			break
 		}
@@ -1248,17 +1289,18 @@ func busquedaArchivoDD(disco *os.File, posicionActualDD int64, nombre string) {
 	name := [20]byte{}
 	copy(name[:], nombre)
 
+	existencia := false
 	for i := 0; i < 5; i++ {
 		if ddAux.ArregloArchivos[i].ApuntadorINodo != -1 {
 			if ddAux.ArregloArchivos[i].NombreArchivo == name {
-				existenciaArchivo = true
+				existencia = true
 				posicionActualInodo = ddAux.ArregloArchivos[i].ApuntadorINodo
 				break
 			}
 		}
 	}
 
-	if existenciaArchivo == false {
+	if existencia == false {
 		if ddAux.ApuntadorExtraDD != -1 {
 			busquedaArchivoDD(disco, ddAux.ApuntadorExtraDD, nombre)
 		}
@@ -1267,7 +1309,6 @@ func busquedaArchivoDD(disco *os.File, posicionActualDD int64, nombre string) {
 
 func busquedaArchivoBloques(disco *os.File, posicionActualBloque int64) {
 	bloqueAux := obtenerBloque(disco, posicionActualBloque)
-
 	contenidoArchivo += retornarStringLimpio(bloqueAux.Contenido[:])
 }
 
@@ -1288,40 +1329,37 @@ func busquedaArchivoInodo(disco *os.File, posicionActualInodo int64) {
 func obtenerContenidoArchivo(disco *os.File, path string) string {
 
 	contenidoArchivo = ""
-
+	posicionActualInodo = 0
 	posicionActualAVD = int64(super.InicioAVD)
 
 	listado := strings.Split(path, "/")
 	for i := 1; i < len(listado)-1; i++ {
 		verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 0)
 		if existenciaAVD == false {
-			fmt.Println("Alguna de las carpetas padres a las cual desea acceder no existe")
-			return ""
+			fmt.Println("\033[1;31mAlguna de las carpetas padres a las cual desea acceder no existe\033[0m")
+			return contenidoArchivo
 		}
 	}
 
 	avdAux := obtenerAVD(disco, posicionActualAVD)
 
 	if avdAux.ApuntadorDD == -1 {
-		fmt.Println("La carpeta no tiene ningun archivo asociado")
-		return ""
+		fmt.Println("\033[1;31mLa carpeta no tiene ningun archivo asociado\033[0m")
+		return contenidoArchivo
 	}
-
 	busquedaArchivoDD(disco, avdAux.ApuntadorDD, listado[len(listado)-1])
-
 	if posicionActualInodo == 0 {
-		fmt.Println("El archivo no existe en la carpeta")
-		return ""
+		fmt.Println("\033[1;31mEl archivo no existe en la carpeta\033[0m")
+		return contenidoArchivo
 	}
 
 	busquedaArchivoInodo(disco, posicionActualInodo)
-
 	return contenidoArchivo
 }
 
 func cerrarSesion() {
 	if loggeado == false {
-		fmt.Println("Debe de iniciar sesion para poder cerrarla")
+		fmt.Println("\033[1;31mDebe de iniciar sesion para poder cerrala\033[0m")
 		return
 	}
 
@@ -1329,26 +1367,25 @@ func cerrarSesion() {
 	usuarioActual = ""
 	grupoActual = ""
 	contraActual = ""
-	fmt.Println("Se a cerrado la sesion exitosamente")
+	fmt.Println("\033[1;32mSe a cerrado la sesion\033[0m")
 }
 
 func iniciarSesion(id, usr, pwd string) {
 	disco, _, inicio := obtenerDiscoMontado(id)
 
 	if disco == nil {
-		fmt.Println("El disco no se encuentra montado")
 		return
 	}
 
 	estado, _ := obtenerEstadoPerdida(id)
 
 	if estado {
-		fmt.Println("La particion presento una perdida")
+		fmt.Println("\033[1;31mLa particion presento una perdida\033[0m")
 		return
 	}
 
 	if loggeado == true {
-		fmt.Println("Ya existe una sesion iniciada en el sistema")
+		fmt.Println("\033[1;31mYa existe una sesion iniciada en el sistema\033[0m")
 		return
 	}
 
@@ -1375,9 +1412,9 @@ func iniciarSesion(id, usr, pwd string) {
 
 	disco.Close()
 	if banderaEncontado {
-		fmt.Println("A inicio sesion exitosamente")
+		fmt.Println("\033[1;32mA iniciado sesion exitosamente\033[0m")
 	} else {
-		fmt.Println("Sus credenciales no se han econtrado en el sistema")
+		fmt.Println("\033[1;31mSus credenciales no se han encontrado en el sistema\033[0m")
 	}
 
 }
@@ -1387,29 +1424,28 @@ func crearGrupo(id, name string) {
 	disco, _, inicio := obtenerDiscoMontado(id)
 
 	if disco == nil {
-		fmt.Println("El disco no se encuentra montado")
 		return
 	}
 
 	estado, _ := obtenerEstadoPerdida(id)
 
 	if estado {
-		fmt.Println("La particion presento una perdida")
+		fmt.Println("\033[1;31mLa particion presento una perdida\033[0m")
 		return
 	}
 
 	if loggeado == false {
-		fmt.Println("Debe de iniciar sesion para poder realizar estas acciones")
+		fmt.Println("\033[1;31mDebe de iniciar sesion para poder realizar estas acciones\033[0m")
 		return
 	}
 
 	if grupoActual != "root" {
-		fmt.Println("Unicamente los usuarios root puede crear grupos")
+		fmt.Println("\033[1;31mUnicamente los usaurios root pueden crear grupos\033[0m")
 		return
 	}
 
 	if len(name) > 10 {
-		fmt.Println("No puede sobrepasar el maximo de 10 caracteres para el nombre del grupo")
+		fmt.Println("\033[1;31mNo pude sobrepasar el maximo de 10 caracteres para el nombre del grupo\033[0m")
 		return
 	}
 
@@ -1437,7 +1473,7 @@ func crearGrupo(id, name string) {
 	}
 
 	if banderaEncontado {
-		fmt.Println("El grupo a crear ya existe dentro del sistena")
+		fmt.Println("\033[1;31mEl grupo a crear ya existe dentro del sistema\033[0m")
 		return
 	}
 
@@ -1448,36 +1484,35 @@ func crearGrupo(id, name string) {
 	crearArchivo(id, "vacio", "/users.txt", contenidoUsuarios, int64(len(contenidoUsuarios)), 0)
 	agregarLog(disco, "mkgrp", "0", "/users.txt", name, int64(len(name)))
 	disco.Close()
-	fmt.Println("Se a agregado el nuevo grupo exitosamente")
+	fmt.Println("\033[1;32mSe a agregado el nuevo grupo\033[0m")
 }
 
 func eliminarGrupo(id, name string) {
 	disco, _, inicio := obtenerDiscoMontado(id)
 
 	if disco == nil {
-		fmt.Println("El disco no se encuentra montado")
 		return
 	}
 
 	estado, _ := obtenerEstadoPerdida(id)
 
 	if estado {
-		fmt.Println("La particion presento una perdida")
+		fmt.Println("\033[1;31mLa particion presento una perdida\033[0m")
 		return
 	}
 
 	if loggeado == false {
-		fmt.Println("Debe de iniciar sesion para poder realizar estas acciones")
+		fmt.Println("\033[1;31mDebe de iniciar sesion para poder realizar estas acciones\033[0m")
 		return
 	}
 
 	if grupoActual != "root" {
-		fmt.Println("Unicamente los usuarios root puede crear grupos")
+		fmt.Println("\033[1;31mUnicamente los usuarios root pueden eliminar grupos\033[0m")
 		return
 	}
 
 	if name == "root" {
-		fmt.Println("El grupo root no puede ser eliminado")
+		fmt.Println("\033[1;31mEl grupo root no puede ser eliminado\033[0m")
 		return
 	}
 
@@ -1506,43 +1541,42 @@ func eliminarGrupo(id, name string) {
 	}
 
 	if banderaEncontado == false {
-		fmt.Println("El grupo a eliminar no se encuentra en el sistema")
+		fmt.Println("\033[1;31mEl grupo a eliminar no se encuentra en el sistema\033[0m")
 		return
 	}
 
 	crearArchivo(id, "vacio", "/users.txt", contenidoAux, int64(len(contenidoAux)), 0)
 	agregarLog(disco, "rmgrp", "0", "/users.txt", name, int64(len(name)))
 	disco.Close()
-	fmt.Println("Se a eliminado el grupo exitosamente")
+	fmt.Println("\033[1;32mSe a eliminado el grupo\033[0m")
 }
 
 func crearUsuario(id, usr, pwd, grupo string) {
 	disco, _, inicio := obtenerDiscoMontado(id)
 
 	if disco == nil {
-		fmt.Println("El disco no se encuentra montado")
 		return
 	}
 
 	estado, _ := obtenerEstadoPerdida(id)
 
 	if estado {
-		fmt.Println("La particion presento una perdida")
+		fmt.Println("\033[1;31mLa particion presento una perdida\033[0m")
 		return
 	}
 
 	if loggeado == false {
-		fmt.Println("Debe de iniciar sesion para poder realizar estas acciones")
+		fmt.Println("\033[1;31mDebe de iniciar sesion para poder realizar estas acciones\033[0m")
 		return
 	}
 
 	if grupoActual != "root" {
-		fmt.Println("Unicamente los usuarios root puede crear grupos")
+		fmt.Println("\033[1;31mUnicamente los usuarios root pueden crear usuarios\033[0m")
 		return
 	}
 
 	if len(grupo) > 10 || len(usr) > 10 || len(pwd) > 10 {
-		fmt.Println("No puede sobrepasar el maximo de 10 caracteres para los parametros")
+		fmt.Println("\033[1;31mNo pueden sobrebapasar el maximo de 10 caracteres para los parametros\033[0m")
 		return
 	}
 
@@ -1584,49 +1618,47 @@ func crearUsuario(id, usr, pwd, grupo string) {
 	}
 
 	if banderaRepetido {
-		fmt.Println("El usuario ya se encuentra en el sistema")
+		fmt.Println("\033[1;31mEl usuario ya se encuentra en el sistema\033[0m")
 		return
 	}
 
 	if banderaEncontado == false {
-		fmt.Println("El grupo no se encuentra en el sistema")
+		fmt.Println("\033[1;31mEl grupo no se encuentra en el sistema\033[0m")
 		return
 	}
 
 	crearArchivo(id, "vacio", "/users.txt", contenidoAux, int64(len(contenidoAux)), 0)
 	agregarLog(disco, "mkusr", "0", "/users.txt", nuevo, int64(len(nuevo)))
 	disco.Close()
-	fmt.Println("Se a agregado el nuevo usuario exitosamente")
-
+	fmt.Println("\033[1;32mSe a agregado el nuevo usuario\033[0m")
 }
 
 func eliminarUsuario(id, usr string) {
 	disco, _, inicio := obtenerDiscoMontado(id)
 
 	if disco == nil {
-		fmt.Println("El disco no se encuentra montado")
 		return
 	}
 
 	estado, _ := obtenerEstadoPerdida(id)
 
 	if estado {
-		fmt.Println("La particion presento una perdida")
+		fmt.Println("\033[1;31mLa particion presento una perdida\033[0m")
 		return
 	}
 
 	if loggeado == false {
-		fmt.Println("Debe de iniciar sesion para poder realizar estas acciones")
+		fmt.Println("\033[1;31mDebe de iniciar sesion para poder realizar estas acciones\033[0m")
 		return
 	}
 
 	if grupoActual != "root" {
-		fmt.Println("Unicamente los usuarios root puede crear grupos")
+		fmt.Println("\033[1;31mUnicamente los usuarios root pueden eliminar usuarios\033[0m")
 		return
 	}
 
 	if usr == "root" {
-		fmt.Println("El usuario root no puede ser eliminado")
+		fmt.Println("\033[1;31mEl usuario root no puede ser eliminado\033[0m")
 		return
 	}
 
@@ -1657,37 +1689,37 @@ func eliminarUsuario(id, usr string) {
 	}
 
 	if banderaEncontado == false {
-		fmt.Println("El usuario a eliminar no se encuentra en el sistema")
+		fmt.Println("\033[1;31mEl usuario a eliminar no se encuentra en el sistema\033[0m")
 		return
 	}
 
 	crearArchivo(id, "vacio", "/users.txt", contenidoAux, int64(len(contenidoAux)), 0)
 	agregarLog(disco, "rmusr", "0", "/users.txt", usr, int64(len(usr)))
 	disco.Close()
-	fmt.Println("Se a eliminado el grupo exitosamente")
+	fmt.Println("\033[1;32mSe a eliminado el usuario\033[0m")
 }
 
 func mostrarContenidoArchivo(id, path string) {
+	contenidoArchivo = ""
 	disco, _, inicio := obtenerDiscoMontado(id)
 
 	if disco == nil {
-		fmt.Println("El disco no se encuentra montado")
 		return
 	}
 
 	estado, _ := obtenerEstadoPerdida(id)
 
 	if estado {
-		fmt.Println("La particion presento una perdida")
+		fmt.Println("\033[1;31mLa particion presento una perdida\033[0m")
 		return
 	}
 
 	super = obtenerSuperBoot(disco, int64(inicio))
 
-	contenido := obtenerContenidoArchivo(disco, path)
+	obtenerContenidoArchivo(disco, path)
 
-	fmt.Println("El contenido del archivo", path, "es: ")
-	fmt.Println(contenido)
+	fmt.Println("\033[1;33mEl contenido del archivo", path, "es: \033[0m")
+	fmt.Println("\033[1;33m" + contenidoArchivo + "\033[0m")
 	disco.Close()
 }
 
@@ -1695,14 +1727,13 @@ func modificarContenidoArchivo(id, ruta, cont string, size int64) {
 	disco, _, inicio := obtenerDiscoMontado(id)
 
 	if disco == nil {
-		fmt.Println("El disco aun no se encuentra montado")
 		return
 	}
 
 	estado, _ := obtenerEstadoPerdida(id)
 
 	if estado {
-		fmt.Println("La particion presento una perdida")
+		fmt.Println("\033[1;31mLa particion presento una perdida\033[0m")
 		return
 	}
 
@@ -1740,7 +1771,8 @@ func modificarContenidoArchivo(id, ruta, cont string, size int64) {
 	for i := 1; i < len(listado); i++ {
 		verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 0)
 		if existenciaAVD == false {
-			fmt.Println("Alguna de las carpetas padre no existe")
+			fmt.Println("\033[1;31mAlguna de las carpetas padre no existe\033[0m")
+			disco.Close()
 			return
 		}
 	}
@@ -1748,102 +1780,59 @@ func modificarContenidoArchivo(id, ruta, cont string, size int64) {
 	avdAux := obtenerAVD(disco, posicionActualAVD)
 
 	if avdAux.ApuntadorDD == -1 {
-		fmt.Println("La carpeta no contiene ningun archivo")
+		fmt.Println("\033[1;31mLa carpeta no contiene ningun archivo\033[0m")
 		disco.Close()
 		return
 	}
 
 	posicionDD := avdAux.ApuntadorDD
-	ddAux := obtenerDD(disco, posicionDD)
-
-	banderaExistenciaArchivo := false
 	nombreAux := [20]byte{}
 	copy(nombreAux[:], rutaCarpeta[len(rutaCarpeta)-1])
-	i := 0
-	for i = 0; i < 5; i++ {
-		if ddAux.ArregloArchivos[i].ApuntadorINodo != -1 {
-			if ddAux.ArregloArchivos[i].NombreArchivo == nombreAux {
-				banderaExistenciaArchivo = true
-				break
+	banderaExistenciaArchivo := false
+
+	for {
+		ddAux := obtenerDD(disco, posicionDD)
+
+		for i := 0; i < 5; i++ {
+			if ddAux.ArregloArchivos[i].ApuntadorINodo != -1 {
+				if ddAux.ArregloArchivos[i].NombreArchivo == nombreAux {
+					borrarInodos(disco, ddAux.ArregloArchivos[i].ApuntadorINodo)
+					internaLimpia := estructuraInterndaDD{ApuntadorINodo: -1}
+					internaLimpia.NombreArchivo = [20]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+					ddAux.ArregloArchivos[i] = internaLimpia
+					escribirDD(disco, posicionDD, ddAux)
+					banderaExistenciaArchivo = true
+					break
+				}
 			}
 		}
+
+		if ddAux.ApuntadorExtraDD == -1 {
+			break
+		}
+		posicionDD = ddAux.ApuntadorExtraDD
 	}
 
-	if i == 5 {
-		i = 4
-	}
-
-	if banderaExistenciaArchivo {
-		borrarInodos(disco, ddAux.ArregloArchivos[i].ApuntadorINodo)
-		internaLimpia := estructuraInterndaDD{ApuntadorINodo: -1}
-		copy(internaLimpia.NombreArchivo[:], "")
-		ddAux.ArregloArchivos[i] = internaLimpia
-		escribirDD(disco, posicionDD, ddAux)
-	}
-
-	banderaDisponible := false
-
-	if super.NoDDLibres == 0 {
-		fmt.Println("Ya no se pueden crear mas detalles de directorio")
+	if banderaExistenciaArchivo == false {
+		fmt.Println("\033[1;31mLa carpeta no contiene el archivo a modificar\033[0m")
 		return
 	}
 
-	i = 0
-	for i = 0; i < 5; i++ {
-		if ddAux.ArregloArchivos[i].ApuntadorINodo == -1 {
-			banderaDisponible = true
+	ddMod := obtenerDD(disco, posicionDD)
+	h := 0
+	for h = 0; h < 5; h++ {
+		if ddMod.ArregloArchivos[h].ApuntadorINodo == -1 {
 			break
 		}
 	}
 
-	if i == 5 {
-		i = 4
+	if h == 5 {
+		h = 4
 	}
-
-	banderaDDAnexo := false
-
-	if banderaDisponible == false {
-		if super.NoDD > 0 {
-			banderaDDAnexo = true
-			posicionAux := int64(super.InicioDD) + (obtenerBitLibreBitMap(disco, super.InicioBitMapDD, super.NoDD) * int64(unsafe.Sizeof(detalleDirectorio{})))
-			ddAux.ApuntadorExtraDD = posicionAux
-			escribirDD(disco, posicionDD, ddAux)
-			posicionDD = posicionAux
-			super.NoDDLibres--
-		} else {
-			fmt.Println("No se pueden crear mas detalles de directorio")
-			return
-		}
-	}
-
-	ddAux = obtenerDD(disco, posicionDD)
-
-	if banderaDDAnexo {
-		ddAux.ApuntadorExtraDD = -1
-	}
-
-	banderaDisponible = false
-
-	i = 0
-	for i = 0; i < 5; i++ {
-		if ddAux.ArregloArchivos[i].ApuntadorINodo == -1 {
-			banderaDisponible = true
-			break
-		}
-	}
-
-	if i == 5 {
-		i = 4
-	}
-
-	interno := estructuraInterndaDD{}
-	copy(interno.Creacion[:], obtenerFecha())
-	copy(interno.Modificacion[:], obtenerFecha())
-	copy(interno.NombreArchivo[:], rutaCarpeta[len(rutaCarpeta)-1])
 
 	noBloquesNecesarios := 1
 	iterador := 0
-	for i := 0; i < len(cont); i++ {
+	for k := 0; k < len(cont); k++ {
 		if iterador == 25 {
 			iterador = 0
 			noBloquesNecesarios++
@@ -1853,7 +1842,7 @@ func modificarContenidoArchivo(id, ruta, cont string, size int64) {
 
 	noInodosNecesarios := 1
 	iterador = 0
-	for i := 0; i < noBloquesNecesarios; i++ {
+	for l := 0; l < noBloquesNecesarios; l++ {
 		if iterador == 4 {
 			iterador = 0
 			noInodosNecesarios++
@@ -1862,32 +1851,37 @@ func modificarContenidoArchivo(id, ruta, cont string, size int64) {
 	}
 
 	if super.NoINodosLibres < uint32(noInodosNecesarios) {
-		fmt.Println("No pueden crearse los inodos necesarios")
+		fmt.Println("\033[1;31mNo pueden crearse los inodos necesarios\033[0m")
 		disco.Close()
 		return
 	}
 
 	if super.NoBloquesLibres < uint32(noBloquesNecesarios) {
-		fmt.Println("No pueden crearse los bloques necesarios")
+		fmt.Println("\033[1;31mNo pueden crearse los bloques necesarios\033[0m")
 		disco.Close()
 		return
 	}
 
 	inicioDivision := 0
 	divisionContenido := make([]string, noBloquesNecesarios)
-	for i := 0; i < noBloquesNecesarios; i++ {
-		if i == noBloquesNecesarios-1 {
-			divisionContenido[i] = cont[inicioDivision:len(cont)]
+	for m := 0; m < noBloquesNecesarios; m++ {
+		if m == noBloquesNecesarios-1 {
+			divisionContenido[m] = cont[inicioDivision:len(cont)]
 		} else {
-			divisionContenido[i] = cont[inicioDivision : inicioDivision+25]
+			divisionContenido[m] = cont[inicioDivision : inicioDivision+25]
 			inicioDivision += 25
 		}
 	}
 
 	bitInodo := obtenerBitLibreBitMap(disco, super.InicioBitMapINodo, super.NoINodos)
 	posicionINodo := int64(super.InicioINodo) + (bitInodo * int64(unsafe.Sizeof(iNodo{})))
+	interno := estructuraInterndaDD{}
+	copy(interno.Creacion[:], obtenerFecha())
+	copy(interno.Modificacion[:], obtenerFecha())
+	copy(interno.NombreArchivo[:], rutaCarpeta[len(rutaCarpeta)-1])
 	interno.ApuntadorINodo = posicionINodo
-	ddAux.ArregloArchivos[i] = interno
+	ddMod.ArregloArchivos[h] = interno
+	escribirDD(disco, posicionDD, ddMod)
 
 	j := 0
 	iterador = 0
@@ -1910,8 +1904,11 @@ func modificarContenidoArchivo(id, ruta, cont string, size int64) {
 			copy(bloque.Contenido[:], divisionContenido[j])
 
 			escribirBloque(disco, posicionBloque, bloque)
+
 			inodoAux.ApuntadroBloques[iterador] = posicionBloque
+
 			escribirEnBitMap(disco, 1, int64(super.InicioBitMapBloques)+bitBloque)
+
 			j++
 			super.NoBloquesLibres--
 			iterador++
@@ -1929,7 +1926,9 @@ func modificarContenidoArchivo(id, ruta, cont string, size int64) {
 		} else {
 			inodoAux.ApuntadorExtraINodo = int64(super.InicioINodo) + (obtenerBitLibreBitMap(disco, super.InicioBitMapINodo, super.NoINodos) * int64(unsafe.Sizeof(iNodo{})))
 		}
+
 		escribirInodo(disco, posicionINodo, inodoAux)
+
 		bitInodo = obtenerBitLibreBitMap(disco, super.InicioBitMapINodo, super.NoINodos)
 		posicionINodo = int64(super.InicioINodo) + (bitInodo * int64(unsafe.Sizeof(iNodo{})))
 		super.NoINodosLibres--
@@ -1937,37 +1936,27 @@ func modificarContenidoArchivo(id, ruta, cont string, size int64) {
 
 	super.BitLibreBloque = uint32(obtenerBitLibreBitMap(disco, super.InicioBitMapBloques, super.NoBloques))
 	super.BitLibreINodo = uint32(obtenerBitLibreBitMap(disco, super.InicioBitMapINodo, super.NoINodos))
-
-	escribirDD(disco, posicionDD, ddAux)
-
-	if banderaDDAnexo {
-		escribirEnBitMap(disco, 1, obtenerBitLibreBitMap(disco, super.InicioBitMapDD, super.NoDD)+int64(super.InicioBitMapDD))
-	}
-
 	super.BitLibreDD = uint32(obtenerBitLibreBitMap(disco, super.InicioBitMapDD, super.NoDD))
 
 	escribirSuperBoot(disco, int64(inicio), super)
 	escribirSuperBoot(disco, int64(super.InicioLog)+(int64(super.NoAVD)*int64(unsafe.Sizeof(bitacora{}))), super)
-
 	agregarLog(disco, "edit", "0", ruta, contAux, size)
-
 	disco.Close()
 
-	fmt.Println("Se a editado el archivo exitosamente")
+	fmt.Println("\033[1;32mSe a editado el archivo exitosamente\033[0m")
 }
 
 func modificarNombre(id, path, name string) {
 	disco, _, inicio := obtenerDiscoMontado(id)
 
 	if disco == nil {
-		fmt.Println("El disco aun no se encuentra montado")
 		return
 	}
 
 	estado, _ := obtenerEstadoPerdida(id)
 
 	if estado {
-		fmt.Println("La particion presento una perdida")
+		fmt.Println("\033[1;31mLa particion presento una perdida\033[0m")
 		return
 	}
 
@@ -1981,7 +1970,7 @@ func modificarNombre(id, path, name string) {
 
 	nombreLimpio := [20]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 
-	if strings.Contains(path, ".") {
+	if strings.Contains(listado[len(listado)-1], ".") {
 		for i := 1; i < len(listado)-1; i++ {
 			verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 0)
 			if existenciaAVD == false {
@@ -1993,14 +1982,14 @@ func modificarNombre(id, path, name string) {
 		}
 
 		if banderaSinCrear {
-			fmt.Println("Una de las carpetas padre aun no se encuentra creada")
+			fmt.Println("\033[1;31mUna de las carpetas padre aun no se encuentra creada\033[0m")
 			return
 		}
 
 		avdAux := obtenerAVD(disco, posicionActualAVD)
 
 		if avdAux.ApuntadorDD == -1 {
-			fmt.Println("La carpeta no tiene archivos")
+			fmt.Println("\033[1;31mLa carpeta no contiene archivos\033[0m")
 			return
 		}
 
@@ -2029,7 +2018,7 @@ func modificarNombre(id, path, name string) {
 		}
 
 		if banderaEncontado == false {
-			fmt.Println("El archivo no se encuentra en la carpeta")
+			fmt.Println("\033[1;31mEl archivo no se encuentra en la carpeta\033[0m")
 			return
 		}
 
@@ -2037,7 +2026,7 @@ func modificarNombre(id, path, name string) {
 
 		agregarLog(disco, "ren", "0", path, name, int64(len(name)))
 
-		fmt.Println("Se a modificado el nombre del archivo correctamente")
+		fmt.Println("\033[1;32mSe a modificado el nombre del archivo\033[0m")
 	} else {
 		for i := 1; i < len(listado); i++ {
 			verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 0)
@@ -2050,7 +2039,7 @@ func modificarNombre(id, path, name string) {
 		}
 
 		if banderaSinCrear {
-			fmt.Println("Una de las carpetas padre aun no se encuentra creada")
+			fmt.Println("\033[1;31mUna de las carpetas aun no se encuentra creada\033[0m")
 			return
 		}
 
@@ -2058,28 +2047,40 @@ func modificarNombre(id, path, name string) {
 		avdAux.Nombre = nombreLimpio
 		copy(avdAux.Nombre[:], name)
 
+		if avdAux.ApuntadoExtraAVD != -1 {
+			posicionRecursiva := avdAux.ApuntadoExtraAVD
+			for {
+				avdRecursivo := obtenerAVD(disco, posicionRecursiva)
+				avdRecursivo.Nombre = nombreLimpio
+				copy(avdRecursivo.Nombre[:], name)
+				escribirAVD(disco, posicionRecursiva, avdRecursivo)
+				if avdRecursivo.ApuntadoExtraAVD == -1 {
+					break
+				}
+				posicionRecursiva = avdAux.ApuntadoExtraAVD
+			}
+		}
+
 		escribirAVD(disco, posicionActualAVD, avdAux)
 
 		agregarLog(disco, "ren", "1", path, name, 1)
 		disco.Close()
-		fmt.Println("Se a modificado el nombre de la carpeta exitosamente")
+		fmt.Println("\033[1;32mSe a modificado el nombre de la carpeta exitosamente\033[0m")
 	}
 }
 
 /*
-estos aun no estan implementados
 func copiarArchivosOCarpetas(id, path, dest string) {
 	disco, _, inicio := obtenerDiscoMontado(id)
 
 	if disco == nil {
-		fmt.Println("El disco aun no se encuentra montado")
 		return
 	}
 
 	estado, _ := obtenerEstadoPerdida(id)
 
 	if estado {
-		fmt.Println("La particion presento una perdida")
+		fmt.Println("\033[1;31mLa particion presento una perdida\033[0m")
 		return
 	}
 
@@ -2091,7 +2092,7 @@ func copiarArchivosOCarpetas(id, path, dest string) {
 
 	listado := strings.Split(path, "/")
 
-	if strings.Contains(path, ".") {
+	if strings.Contains(listado[len(listado)-1], ".") {
 		//se va a copiar el archivo
 		for i := 1; i < len(listado)-1; i++ {
 			verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 0)
@@ -2126,19 +2127,15 @@ func copiarArchivosOCarpetas(id, path, dest string) {
 
 		busquedaArchivoInodo(disco, posicionActualInodo)
 
-		crearArchivo(id, "vacio", dest+"/"+listado[len(listado)-1], contenidoArchivo, int64(len(contenidoArchivo)), 0)
-
-		agregarLog(disco, "cp", "0", dest, path, 1)
+		crearArchivo(id, "vacio", dest+"/"+listado[len(listado)-1], contenidoArchivo, int64(len(contenidoArchivo)), 1)
 
 		fmt.Println("Se a copiado el archivo exitosamente")
 	} else {
 		/*for i := 1; i < len(listado); i++ {
 			verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 0)
 			if existenciaAVD == false {
-				if i != len(listado)-1 {
-					banderaSinCrear = true
-					break
-				}
+				banderaSinCrear = true
+				break
 			}
 		}
 
@@ -2147,7 +2144,39 @@ func copiarArchivosOCarpetas(id, path, dest string) {
 			return
 		}
 
-		avdAux := obtenerAVD(disco, posicionActualAVD)
+		i := 0
+		nombreAux := [20]byte{}
+		copy(nombreAux[:], listado[len(listado)-1])
+		banderaEncontrado := false
+		posicionAVD := posicionActualAVD
+		for {
+			avdAux := obtenerAVD(disco, posicionActualAVD)
+			for i = 0; i < 6; i++ {
+				if avdAux.SubDirectorios[i] != -1 {
+					avdInterno := obtenerAVD(disco, avdAux.SubDirectorios[i])
+					if avdInterno.Nombre == nombreAux {
+						banderaEncontrado = true
+						break
+					}
+				}
+			}
+
+			if banderaEncontrado == false {
+				if avdAux.ApuntadoExtraAVD != -1 {
+					posicionAVD = avdAux.ApuntadoExtraAVD
+				} else {
+					break
+				}
+			} else {
+				break
+			}
+		}
+
+		if banderaEncontrado == false {
+			fmt.Println("La carpeta a copiar no se encuentra en la ruta especificada")
+			return
+		}
+		/*avdAux := obtenerAVD(disco, posicionActualAVD)
 		avdAux.Nombre = nombreLimpio
 		copy(avdAux.Nombre[:], name)
 
@@ -2155,22 +2184,22 @@ func copiarArchivosOCarpetas(id, path, dest string) {
 
 		agregarLog(disco, "ren", "1", path, name, 1)
 		disco.Close()
-		fmt.Println("Se a modificado el nombre de la carpeta exitosamente")*/
+		fmt.Println("Se a modificado el nombre de la carpeta exitosamente")
+*/
 /*}
-}
+}*/
 
 func eliminarArchivosOCarpetas(id, path, especial string) {
 	disco, _, inicio := obtenerDiscoMontado(id)
 
 	if disco == nil {
-		fmt.Println("El disco aun no se encuentra montado")
 		return
 	}
 
 	estado, _ := obtenerEstadoPerdida(id)
 
 	if estado {
-		fmt.Println("La particion presento una perdida")
+		fmt.Println("\033[1;31mLa particion presento una perdida\033[0m")
 		return
 	}
 
@@ -2182,21 +2211,8 @@ func eliminarArchivosOCarpetas(id, path, especial string) {
 
 	listado := strings.Split(path, "/")
 
-	for i := 1; i < len(listado); i++ {
-		verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 0)
-		if existenciaAVD == false {
-			if i != len(listado)-1 {
-				banderaSinCrear = true
-				break
-			}
-		}
-	}
-
-	if banderaSinCrear {
-		fmt.Println("Una de las carpetas padre aun no se encuentra creada")
-	} else {
-
-		for i := 1; i < len(listado); i++ {
+	if strings.Contains(listado[len(listado)-1], ".") {
+		for i := 1; i < len(listado)-1; i++ {
 			verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 0)
 			if existenciaAVD == false {
 				if i != len(listado)-1 {
@@ -2206,24 +2222,346 @@ func eliminarArchivosOCarpetas(id, path, especial string) {
 			}
 		}
 
-		if strings.Contains(path, ".txt") {
-
-		} else {
-			agregarLog(disco, "mkdir", "1", path, "", 1)
-			disco.Seek(int64(inicio), 0)
-			buffer := bytes.NewBuffer([]byte{})
-			binary.Write(buffer, binary.BigEndian, &super)
-			disco.Write(buffer.Bytes())
-			disco.Seek(int64(super.InicioLog)+(int64(super.NoAVD)*int64(unsafe.Sizeof(bitacora{}))), 0)
-			disco.Write(buffer.Bytes())
-			disco.Close()
+		if banderaSinCrear {
+			fmt.Println("\033[1;31mUna de las carpetas padres no existe\033[0m")
+			return
 		}
 
-	}
+		avdAux := obtenerAVD(disco, posicionActualAVD)
 
+		if avdAux.ApuntadorDD == -1 {
+			fmt.Println("\033[1;31mLa carpeta no cuenta con ningun archivo\033[0m")
+			return
+		}
+
+		nombreAux := [20]byte{}
+		copy(nombreAux[:], listado[len(listado)-1])
+		posicionDD := avdAux.ApuntadorDD
+		banderaEncontrado := false
+		i := 0
+		for {
+			ddAux := obtenerDD(disco, posicionDD)
+
+			for i = 0; i < 5; i++ {
+				if ddAux.ArregloArchivos[i].ApuntadorINodo != -1 {
+					if ddAux.ArregloArchivos[i].NombreArchivo == nombreAux {
+						banderaEncontrado = true
+						break
+					}
+				}
+			}
+
+			if i == 5 {
+				i = 4
+			}
+
+			if banderaEncontrado {
+				break
+			}
+			if ddAux.ApuntadorExtraDD == -1 {
+				break
+			} else {
+				posicionDD = ddAux.ApuntadorExtraDD
+				i = 0
+			}
+		}
+
+		if banderaEncontrado == false {
+			fmt.Println("\033[1;31mEl archivo a elimianr no se encuentra en la ruta especificada\033[0m")
+			return
+		}
+
+		ddAux := obtenerDD(disco, posicionDD)
+		internoLimpio := estructuraInterndaDD{ApuntadorINodo: -1}
+		copy(internoLimpio.NombreArchivo[:], "")
+		posicionInodoBorrar := ddAux.ArregloArchivos[i].ApuntadorINodo
+		ddAux.ArregloArchivos[i] = internoLimpio
+		escribirDD(disco, posicionDD, ddAux)
+		borrarInodos(disco, posicionInodoBorrar)
+		agregarLog(disco, "rm", "0", path, "", 1)
+		escribirSuperBoot(disco, int64(inicio), super)
+		escribirSuperBoot(disco, int64(super.InicioLog)+(int64(super.NoAVD)*int64(unsafe.Sizeof(bitacora{}))), super)
+		fmt.Println("\033[1;32mEl archivo se a eliminado exitosamente\033[0m")
+		disco.Close()
+
+	} else {
+		for i := 1; i < len(listado)-1; i++ {
+			verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 0)
+			if existenciaAVD == false {
+				banderaSinCrear = true
+				break
+			}
+		}
+
+		if banderaSinCrear {
+			fmt.Println("\033[1;31mUna de las carpetas aun no se encuentra creada\033[0m")
+			return
+		} else {
+			nombreAux := [20]byte{}
+			copy(nombreAux[:], listado[len(listado)-1])
+			posicionEliminar := int64(0)
+			for {
+				avdAux := obtenerAVD(disco, posicionActualAVD)
+				for i := 0; i < 6; i++ {
+					if avdAux.SubDirectorios[i] != -1 {
+						avdEliminar := obtenerAVD(disco, avdAux.SubDirectorios[i])
+						if avdEliminar.Nombre == nombreAux {
+							posicionEliminar = avdAux.SubDirectorios[i]
+							avdAux.SubDirectorios[i] = -1
+							escribirAVD(disco, posicionActualAVD, avdAux)
+							break
+						}
+					}
+				}
+
+				if avdAux.ApuntadoExtraAVD == -1 {
+					break
+				}
+
+				posicionActualAVD = avdAux.ApuntadoExtraAVD
+			}
+
+			if posicionEliminar == 0 {
+				fmt.Println("\033[1;31mLa carpeta a eliminar no se encuentra en la ruta especificada\033[0m")
+				return
+			}
+
+			borrarAVD(disco, posicionEliminar)
+
+			agregarLog(disco, "rm", "1", path, "", 1)
+			escribirSuperBoot(disco, int64(inicio), super)
+			escribirSuperBoot(disco, int64(super.InicioLog)+(int64(super.NoAVD)*int64(unsafe.Sizeof(bitacora{}))), super)
+			disco.Close()
+			fmt.Println("\033[1;32mSe a eliminado la carpeta y todo su contenido exitosamente\033[0m")
+		}
+	}
 }
 
 func moverArchivoYCarpetas(id, path, destino string) {
+	disco, _, inicio := obtenerDiscoMontado(id)
 
+	if disco == nil {
+		return
+	}
+
+	estado, _ := obtenerEstadoPerdida(id)
+
+	if estado {
+		fmt.Println("\033[1;31mLa particion presento una perdida\033[0m")
+		return
+	}
+
+	super = obtenerSuperBoot(disco, int64(inicio))
+
+	posicionActualAVD = int64(super.InicioAVD)
+
+	banderaSinCrear := false
+
+	listado := strings.Split(path, "/")
+
+	if strings.Contains(listado[len(listado)-1], ".") {
+		//se va a mover el archivo
+		for i := 1; i < len(listado)-1; i++ {
+			verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 0)
+			if existenciaAVD == false {
+				if i != len(listado)-1 {
+					banderaSinCrear = true
+					break
+				}
+			}
+		}
+
+		if banderaSinCrear {
+			fmt.Println("\033[1;31mUna de las carpetas padre aun no se encuentra creada\033[0m")
+			disco.Close()
+			return
+		}
+
+		avdAux := obtenerAVD(disco, posicionActualAVD)
+
+		if avdAux.ApuntadorDD == -1 {
+			fmt.Println("\033[1;31mLa carpeta no tiene archivos\033[0m")
+			disco.Close()
+			return
+		}
+
+		banderaSinCrear = false
+		posicionActualAVD = int64(super.InicioAVD)
+		dest := strings.Split(destino, "/")
+		for i := 1; i < len(dest); i++ {
+			verificarExistenciaAVD(disco, posicionActualAVD, dest[i], 0)
+			if existenciaAVD == false {
+				if i != len(listado)-1 {
+					banderaSinCrear = true
+					break
+				}
+			}
+		}
+
+		if banderaSinCrear {
+			fmt.Println("\033[1;31mLa ruta a la que se desea mover el archivo no existe\033[0m")
+			disco.Close()
+			return
+		}
+
+		nombreAux := [20]byte{}
+		copy(nombreAux[:], listado[len(listado)-1])
+
+		posicionMover := int64(0)
+		posicionDD := avdAux.ApuntadorDD
+		for {
+			ddAux := obtenerDD(disco, posicionDD)
+			for i := 0; i < 5; i++ {
+				if ddAux.ArregloArchivos[i].ApuntadorINodo != -1 {
+					if ddAux.ArregloArchivos[i].NombreArchivo == nombreAux {
+						posicionMover = ddAux.ArregloArchivos[i].ApuntadorINodo
+						internoLimpio := estructuraInterndaDD{ApuntadorINodo: -1}
+						copy(internoLimpio.NombreArchivo[:], "")
+						ddAux.ArregloArchivos[i] = internoLimpio
+						break
+					}
+				}
+			}
+
+			if ddAux.ApuntadorExtraDD == -1 {
+				break
+			}
+			posicionDD = ddAux.ApuntadorExtraDD
+		}
+
+		if posicionMover == 0 {
+			fmt.Println("\033[1;31mEl archivo no se encuentra en la ruta especificad\033[0m")
+			disco.Close()
+			return
+		}
+
+		avdMover := obtenerAVD(disco, posicionActualAVD)
+		posicionDD = avdMover.ApuntadorDD
+
+		if avdMover.ApuntadorDD == -1 {
+			internoLimpio := estructuraInterndaDD{ApuntadorINodo: -1}
+			copy(internoLimpio.NombreArchivo[:], "")
+			ddNuevo := detalleDirectorio{ApuntadorExtraDD: -1}
+			ddNuevo.ArregloArchivos[0] = internoLimpio
+			ddNuevo.ArregloArchivos[1] = internoLimpio
+			ddNuevo.ArregloArchivos[2] = internoLimpio
+			ddNuevo.ArregloArchivos[3] = internoLimpio
+			ddNuevo.ArregloArchivos[4] = internoLimpio
+			posicionDD = int64(super.InicioDD) + (obtenerBitLibreBitMap(disco, super.InicioBitMapDD, super.NoDD) * int64(unsafe.Sizeof(detalleDirectorio{})))
+			escribirDD(disco, posicionDD, ddNuevo)
+		}
+
+		for {
+			ddLlenar := obtenerDD(disco, posicionDD)
+			for i := 0; i < 5; i++ {
+				if ddLlenar.ArregloArchivos[i].ApuntadorINodo == -1 {
+					ddLlenar.ArregloArchivos[i].ApuntadorINodo = posicionMover
+					ddLlenar.ArregloArchivos[i].NombreArchivo = nombreAux
+					copy(ddLlenar.ArregloArchivos[i].Creacion[:], obtenerFecha())
+					copy(ddLlenar.ArregloArchivos[i].Modificacion[:], obtenerFecha())
+					escribirDD(disco, posicionDD, ddLlenar)
+					break
+				}
+			}
+
+			if ddLlenar.ApuntadorExtraDD == -1 {
+				break
+			}
+
+			posicionDD = ddLlenar.ApuntadorExtraDD
+		}
+		//agregar a la bitacora
+		agregarLog(disco, "mv", "0", path, destino, 1)
+		disco.Close()
+		fmt.Println("\033[1;32mSe a movido el archivo exitosamente\033[0m")
+	} else {
+		//se va a mover la carpeta
+		for i := 1; i < len(listado)-1; i++ {
+			verificarExistenciaAVD(disco, posicionActualAVD, listado[i], 0)
+			if existenciaAVD == false {
+				if i != len(listado)-1 {
+					banderaSinCrear = true
+					break
+				}
+			}
+		}
+
+		posicionPadre := posicionActualAVD
+		if banderaSinCrear {
+			fmt.Println("\033[1;31mUna de las carpetas padre aun no se encuentra creada\033[0m")
+			disco.Close()
+			return
+		}
+
+		banderaSinCrear = false
+		posicionActualAVD = int64(super.InicioAVD)
+		dest := strings.Split(destino, "/")
+		for i := 1; i < len(dest); i++ {
+			verificarExistenciaAVD(disco, posicionActualAVD, dest[i], 0)
+			if existenciaAVD == false {
+				if i != len(listado)-1 {
+					banderaSinCrear = true
+					break
+				}
+			}
+		}
+
+		if banderaSinCrear {
+			fmt.Println("\033[1;31mLa ruta a la que se desea mover el archivo no existe\033[0m")
+			disco.Close()
+			return
+		}
+
+		nombreAux := [20]byte{}
+		copy(nombreAux[:], listado[len(listado)-1])
+
+		posicionMover := int64(0)
+
+		for {
+			avdAux := obtenerAVD(disco, posicionPadre)
+			for i := 0; i < 6; i++ {
+				if avdAux.SubDirectorios[i] != -1 {
+					avdValidar := obtenerAVD(disco, avdAux.SubDirectorios[i])
+					if avdValidar.Nombre == nombreAux {
+						posicionMover = avdAux.SubDirectorios[i]
+						avdAux.SubDirectorios[i] = -1
+						escribirAVD(disco, posicionPadre, avdAux)
+						break
+					}
+				}
+			}
+
+			if avdAux.ApuntadoExtraAVD == -1 {
+				break
+			}
+			posicionPadre = avdAux.ApuntadoExtraAVD
+		}
+
+		if posicionMover == 0 {
+			fmt.Println("\033[1;31mLa carpeta a mover no se encuentra en la ruta especificada\033[0m")
+			disco.Close()
+			return
+		}
+
+		for {
+			avdMover := obtenerAVD(disco, posicionActualAVD)
+			for i := 0; i < 6; i++ {
+				if avdMover.SubDirectorios[i] == -1 {
+					avdMover.SubDirectorios[i] = posicionMover
+					escribirAVD(disco, posicionActualAVD, avdMover)
+					break
+				}
+			}
+
+			if avdMover.ApuntadoExtraAVD == -1 {
+				break
+			}
+			posicionActualAVD = avdMover.ApuntadoExtraAVD
+		}
+
+		agregarLog(disco, "mv", "1", path, destino, 1)
+		disco.Close()
+		fmt.Println("\033[1;32mSe a movido la carpeta exitosamente\033[0m")
+
+	}
 }
-*/

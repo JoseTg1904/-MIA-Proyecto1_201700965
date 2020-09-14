@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"os"
 	"regexp"
 	"strconv"
@@ -47,6 +46,7 @@ func analizarComandoPrincipal(entrada []string) {
 		case "cat":
 			analizarParametrosCat(entrada)
 		case "rm":
+			analizarParametrosRm(entrada)
 		case "edit":
 			analizarParametrosEdit(entrada)
 		case "ren":
@@ -56,7 +56,7 @@ func analizarComandoPrincipal(entrada []string) {
 		case "cp":
 			//analizarParametrosCp(entrada)
 		case "mv":
-			//analizarParametrosMv(entrada)
+			analizarParametrosMv(entrada)
 		case "find":
 		case "chown":
 		case "chgrp":
@@ -67,13 +67,12 @@ func analizarComandoPrincipal(entrada []string) {
 		case "rep":
 			analizarParametrosRep(entrada)
 		default:
-			fmt.Println("El comando ingresado no es valido")
+			fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
 		}
-	} else {
-		fmt.Println("Has echo un comentario")
 	}
 }
 
+/*
 func analizarParametrosCp(entrada []string) {
 	id := "vacio"
 	path := "vacio"
@@ -101,9 +100,33 @@ func analizarParametrosCp(entrada []string) {
 		fmt.Println("El comando ingresado no es valido")
 	}
 }
-
+*/
 func analizarParametrosMv(entrada []string) {
+	id := "vacio"
+	path := "vacio"
+	destino := "vacio"
 
+	for i := 1; i < len(entrada); i++ {
+		aux := strings.Split(entrada[i], "->")
+		if strings.Contains(aux[0], "#") == false {
+			switch strings.ToLower(aux[0]) {
+			case "-dest":
+				destino = obtenerPath(entrada, i)
+			case "-path":
+				path = obtenerPath(entrada, i)
+			case "-id":
+				id = strings.ToLower(aux[1])
+			}
+		} else {
+			break
+		}
+	}
+
+	if id != "vacio" && path != "vacio" && destino != "vacio" {
+		moverArchivoYCarpetas(id, path, destino)
+	} else {
+		fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
+	}
 }
 
 func analizarParametrosRen(entrada []string) {
@@ -130,7 +153,7 @@ func analizarParametrosRen(entrada []string) {
 	if id != "vacio" && path != "vacio" && name != "vacio" {
 		modificarNombre(id, path, name)
 	} else {
-		fmt.Println("El comando ingresado no es valido")
+		fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
 	}
 }
 
@@ -156,10 +179,10 @@ func analizarParametrosRm(entrada []string) {
 	}
 
 	if id != "vacio" && path != "vacio" {
-		//eliminar
+		eliminarArchivosOCarpetas(id, path, especial)
 		fmt.Println(especial)
 	} else {
-		fmt.Println("El comando ingresado no es valido")
+		fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
 	}
 }
 
@@ -181,7 +204,7 @@ func analizarParametrosEdit(entrada []string) {
 				if val, _ := strconv.Atoi(aux[1]); val >= 0 {
 					size, _ = strconv.Atoi(aux[1])
 				} else {
-					fmt.Println("El parametro size debe de ser igual o mayor a cero")
+					fmt.Println("\033[1;31mEl parametro size debe de ser igual o mayor a cero\033[0m")
 					return
 				}
 			case "-cont":
@@ -195,7 +218,7 @@ func analizarParametrosEdit(entrada []string) {
 	if id != "vacio" && path != "vacio" {
 		modificarContenidoArchivo(id, path, cont, int64(size))
 	} else {
-		fmt.Println("El comando ingresado no es valido")
+		fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
 	}
 }
 
@@ -223,7 +246,7 @@ func analizarParametrosCat(entrada []string) {
 			mostrarContenidoArchivo(id, listado[i])
 		}
 	} else {
-		fmt.Println("El comando ingresado no es valido")
+		fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
 	}
 }
 
@@ -248,7 +271,7 @@ func analizarParametrosRmusr(entrada []string) {
 	if id != "vacio" && usr != "vacio" {
 		eliminarUsuario(id, usr)
 	} else {
-		fmt.Println("El comando ingresado no es valido")
+		fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
 	}
 }
 
@@ -279,7 +302,7 @@ func analizarParametrosMkusr(entrada []string) {
 	if id != "vacio" && usr != "vacio" && pwd != "vacio" && grp != "vacio" {
 		crearUsuario(id, usr, pwd, grp)
 	} else {
-		fmt.Println("El comando ingresado no es valido")
+		fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
 	}
 }
 
@@ -301,7 +324,7 @@ func analizarParametrosLoss(entrada []string) {
 	if id != "vacio" {
 		simulacionPerdida(id)
 	} else {
-		fmt.Println("El comando ingresado no es valido")
+		fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
 	}
 }
 
@@ -323,7 +346,7 @@ func analizarParametrosRecovery(entrada []string) {
 	if id != "vacio" {
 		recuperarSistema(id)
 	} else {
-		fmt.Println("El comando ingresado no es valido")
+		fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
 	}
 }
 
@@ -348,7 +371,7 @@ func analizarParametrosMkfile(entrada []string) {
 				if val, _ := strconv.Atoi(aux[1]); val >= 0 {
 					size, _ = strconv.Atoi(aux[1])
 				} else {
-					fmt.Println("El parametro size debe de ser igual o mayor a cero")
+					fmt.Println("\033[1;31mEl parametro size debe de ser igual o mayor a cero\033[0m")
 					return
 				}
 			case "-cont":
@@ -362,7 +385,7 @@ func analizarParametrosMkfile(entrada []string) {
 	if id != "vacio" && path != "vacio" {
 		crearArchivo(id, especial, path, cont, int64(size), 1)
 	} else {
-		fmt.Println("El comando ingresado no es valido")
+		fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
 	}
 }
 
@@ -399,7 +422,7 @@ func analizarParametrosRep(entrada []string) {
 	if id != "vacio" && path != "vacio" && nombre != "vacio" {
 		desicionReporte(id, path, ruta, nombre)
 	} else {
-		fmt.Println("El comando ingresado no es valido")
+		fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
 	}
 }
 
@@ -427,7 +450,7 @@ func analizarParametrosMkdir(entrada []string) {
 	if id != "vacio" && path != "vacio" {
 		crearAVD(id, especial, path, 1)
 	} else {
-		fmt.Println("El comando ingresado no es valido")
+		fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
 	}
 }
 
@@ -452,7 +475,7 @@ func analizarParametrosMkgrp(entrada []string) {
 	if id != "vacio" && name != "vacio" {
 		crearGrupo(id, name)
 	} else {
-		fmt.Println("El comando ingresado no es valido")
+		fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
 	}
 }
 
@@ -477,7 +500,7 @@ func analizarParametrosRmgrp(entrada []string) {
 	if id != "vacio" && name != "vacio" {
 		eliminarGrupo(id, name)
 	} else {
-		fmt.Println("El comando ingresado no es valido")
+		fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
 	}
 }
 
@@ -505,7 +528,7 @@ func analizarParametrosLogin(entrada []string) {
 	if id != "vacio" && pwd != "vacio" && usr != "vacio" {
 		iniciarSesion(id, usr, pwd)
 	} else {
-		fmt.Println("El comando ingresado no es valido")
+		fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
 	}
 }
 
@@ -545,7 +568,7 @@ func analizarParametrosMkfs(entrada []string) {
 			formateoSistema(id, tipo)
 		}
 	} else {
-		fmt.Println("El comando ingresado no es valido")
+		fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
 	}
 }
 
@@ -567,7 +590,7 @@ func analizarParametrosExec(entrada []string) {
 	if path != "vacio" {
 		lecturaDeArchivo(path)
 	} else {
-		fmt.Println("El comando ingresado no es valido")
+		fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
 	}
 }
 
@@ -591,7 +614,7 @@ func analizarParametrosUnmount(entrada []string) {
 			desmontarParticion(listado[i])
 		}
 	} else {
-		fmt.Println("El comando ingresado no es valido")
+		fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
 	}
 }
 
@@ -673,7 +696,7 @@ func analizarParametrosFdisk(entrada []string) {
 		}
 
 	} else {
-		fmt.Println("El comando ingresado no es valido")
+		fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
 	}
 }
 
@@ -695,7 +718,7 @@ func analizarParametrosRmdisk(entrada []string) {
 	if path != "vacio" {
 		eliminarDisco(path)
 	} else {
-		fmt.Println("El comando ingresado no es valido")
+		fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
 	}
 }
 
@@ -731,9 +754,9 @@ func analizarParametrosMkdisk(entrada []string) {
 		crearDisco(size, path, name, unit)
 	} else {
 		if size == -1 {
-			fmt.Println("El tamaño del disco ingresado es invalido")
+			fmt.Println("\033[1;31mEl tamaño del disco ingresado es invalido\033[0m")
 		} else {
-			fmt.Println("Revise los parametros del comando")
+			fmt.Println("\033[1;31mEl comando ingresado no es valido\033[0m")
 		}
 	}
 }
@@ -776,8 +799,8 @@ func lecturaDeArchivo(path string) {
 	file, err := os.Open(path)
 
 	if err != nil {
-		fmt.Println("Error en la apertura del archivo")
-		log.Fatal(err)
+		fmt.Println("\033[1;31mError en la lectura del archivo\033[0m")
+		main()
 	}
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
@@ -801,7 +824,7 @@ func lecturaDeArchivo(path string) {
 }
 
 func pausaDeLaEjecucion() {
-	fmt.Print("\nPresione la tecla enter para continuar con la ejecucion c:\n")
+	fmt.Println("\033[1;33mPresione la tecla enter para continuar con la ejecucion c:\033[0m")
 	val := ""
 	fmt.Scanln(&val)
 }

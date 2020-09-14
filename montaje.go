@@ -32,7 +32,12 @@ var particionVacia = particionMontada{}
 func montarParticion(path, name string) {
 	archivo := buscarDisco(path)
 	if archivo == nil {
-		fmt.Println("El archivo del disco aun no a sido creado")
+		fmt.Println("\033[1;31mEl archivo del disco aun no a sido creado\033[0m")
+	}
+
+	if validarExistenciaParticion(archivo, path, name) == false {
+		fmt.Println("\033[1;31mLa particion no se encuentra en el disco\033[0m")
+		return
 	}
 
 	contadorDiscosMontados := 0
@@ -56,7 +61,6 @@ func montarParticion(path, name string) {
 	if banderaDiscoMontado {
 
 		banderaParticionMontada := false
-		contadorParticionesMontadas := 0
 		banderaParticionDuplicada := false
 		nombreAux := [16]byte{}
 		copy(nombreAux[:], name)
@@ -71,14 +75,12 @@ func montarParticion(path, name string) {
 		}
 
 		if banderaParticionDuplicada {
-			fmt.Println("la particion ya se encuentra montada")
+			fmt.Println("\033[1;31mLa particion ya se encuentra montada\033[0m")
 			return
 		}
 
 		for j := 0; j < 100; j++ {
-			if discosMontados[i].ParticionesMontadas[j] != particionVacia {
-				contadorParticionesMontadas++
-			} else {
+			if discosMontados[i].ParticionesMontadas[j] == particionVacia {
 				particion := particionMontada{ID: j + 1,
 					Perdida: false}
 				copy(particion.Nombre[:], name)
@@ -89,18 +91,13 @@ func montarParticion(path, name string) {
 		}
 
 		if banderaParticionMontada {
-			fmt.Println("Se a montado la particion")
+			fmt.Println("\033[1;32mSe a montado la particion\033[0m")
 			return
 		}
-
-		if contadorParticionesMontadas == 100 {
-			fmt.Println("Ya no se pueden montar mas particiones")
-			return
-		}
-
 	} else {
 		if contadorDiscosMontados == 26 {
-			fmt.Println("Ya no se pueden montar mas discos")
+			fmt.Println("\033[1;31mYa no se pueden montar mas discos\033[0m")
+			return
 		}
 
 		k := 0
@@ -119,44 +116,95 @@ func montarParticion(path, name string) {
 		copy(particion.Nombre[:], name)
 		discosMontados[k].ParticionesMontadas[0] = particion
 
-		fmt.Println("Se a montado la particion")
+		fmt.Println("\033[1;32mSe a montado la particion\033[0m")
+	}
+}
+
+func validarExistenciaParticion(archivo *os.File, path, name string) bool {
+	mbrAux := obtenerMBR(archivo)
+
+	contExtendidas := 0
+	banderaNombre := false
+	nombre := [16]byte{}
+	copy(nombre[:], name)
+
+	for i := 0; i < 4; i++ {
+		if mbrAux.Particiones[i].Inicio != -1 {
+			if mbrAux.Particiones[i].Tipo == 'e' {
+				contExtendidas++
+			}
+			if mbrAux.Particiones[i].Nombre == nombre {
+				banderaNombre = true
+			}
+		}
 	}
 
+	if contExtendidas == 1 {
+		posicionActualEBR := int64(0)
+		for i := 0; i < 4; i++ {
+			if particionAux := mbrAux.Particiones[i]; particionAux.Inicio != -1 {
+				if particionAux.Tipo == 'e' {
+					posicionActualEBR = mbrAux.Particiones[i].Inicio
+				}
+			}
+		}
+
+		for {
+			ebrAux := obtnerEBR(archivo, posicionActualEBR)
+
+			if ebrAux.Nombre == nombre {
+				banderaNombre = true
+				break
+			}
+
+			if ebrAux.Siguiente == -1 {
+				break
+			}
+			posicionActualEBR = ebrAux.Siguiente
+		}
+	}
+
+	return banderaNombre
 }
 
 func desmontarParticion(id string) {
 	disco := string(id[2])
-	particion, _ := strconv.Atoi(id[2:len(id)])
+	particion, _ := strconv.Atoi(id[3:len(id)])
 	discoAux := discoMontado{}
-
+	vacia := particionMontada{}
 	banderaDesmontaje := false
 
-	for i := 0; i < 26; i++ {
+	i := 0
+	for i = 0; i < 26; i++ {
 		if discosMontados[i].ID == disco {
 			discoAux = discosMontados[i]
 			break
 		}
 	}
 
+	if i == 26 {
+		i = 25
+	}
+
 	if discoAux != discoVacio {
-		for i := 0; i < 100; i++ {
-			if discoAux.ParticionesMontadas[i].ID == particion {
-				discoAux.ParticionesMontadas[i] = particionVacia
-				banderaDesmontaje = true
+		for j := 0; j < 100; j++ {
+			if discosMontados[i].ParticionesMontadas[j] != vacia {
+				if discosMontados[i].ParticionesMontadas[j].ID == particion {
+					discosMontados[i].ParticionesMontadas[j] = particionMontada{}
+					banderaDesmontaje = true
+					break
+				}
 			}
 		}
 
 		if banderaDesmontaje {
-			fmt.Println("La particion a sido desmontada")
-			return
+			fmt.Println("\033[1;32mLa particion a sido desmontado\033[0m")
 		} else {
-			fmt.Println("La particion no se a encontrado")
-			return
+			fmt.Println("\033[1;31mLa particion no se a encontrado\033[0m")
 		}
 
 	} else {
-		fmt.Println("El disco aun no se encuentra montado")
-		return
+		fmt.Println("\033[1;31mEl disco aun no se encuentra montado\033[0m")
 	}
 }
 
@@ -213,12 +261,12 @@ func obtenerDiscoMontado(id string) (*os.File, uint32, uint32) {
 			return archivo, tamanio, inicio
 		}
 
-		fmt.Println("La particion no se a encontrado")
+		fmt.Println("\033[1;31mLa particion no se a encontrado\033[0m")
 		return nil, 0, 0
 
 	}
 
-	fmt.Println("El disco aun no se encuentra montado")
+	fmt.Println("\033[1;31mEl disco aun no se encuentrada montado\033[0m")
 	return nil, 0, 0
 }
 
@@ -246,18 +294,23 @@ func desmontarParticionEliminada(path, nombre string) {
 	nombreAux := [16]byte{}
 	copy(nombreAux[:], nombre)
 
-	for i := 0; i < 26; i++ {
+	i := 0
+	for i = 0; i < 26; i++ {
 		if discosMontados[i].Path == path {
 			discoAux = discosMontados[i]
 			break
 		}
 	}
 
+	if i == 26 {
+		i = 25
+	}
+
 	if discoAux != vacio {
 		for j := 0; j < 100; j++ {
-			if discoAux.ParticionesMontadas[j] != vacia {
-				if discoAux.ParticionesMontadas[j].Nombre == nombreAux {
-					discoAux.ParticionesMontadas[j] = vacia
+			if discosMontados[i].ParticionesMontadas[j] != vacia {
+				if discosMontados[i].ParticionesMontadas[j].Nombre == nombreAux {
+					discosMontados[i].ParticionesMontadas[j] = vacia
 					break
 				}
 			}

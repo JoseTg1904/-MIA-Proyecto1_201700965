@@ -35,7 +35,7 @@ func crearDisco(size int64, path, name, unit string) {
 
 	//validacion de la existencia del archivo
 	if _, err := os.Stat(path + name); err == nil {
-		fmt.Println("El archivo del disco ya existe")
+		fmt.Println("\033[1;31mEl archivo del disco ya existe\033[0m")
 		return
 	}
 
@@ -50,6 +50,11 @@ func crearDisco(size int64, path, name, unit string) {
 	mbr := discoMBR{}
 	mbr.Tamanio = size
 	mbr.Random = numRand
+	particionLimpia := particion{Inicio: -1}
+	mbr.Particiones[0] = particionLimpia
+	mbr.Particiones[1] = particionLimpia
+	mbr.Particiones[2] = particionLimpia
+	mbr.Particiones[3] = particionLimpia
 	numRand++
 	copy(mbr.Creacion[:], tiempoActual)
 
@@ -68,22 +73,24 @@ func crearDisco(size int64, path, name, unit string) {
 	binary.Write(buffer, binary.BigEndian, &mbr)
 	archivo.Write(buffer.Bytes())
 
-	fmt.Println("Se a creado con exito el disco")
+	fmt.Println("\033[1;32mSe a creado con exito el disco\033[0m")
 }
 
 //rmdisk
 func eliminarDisco(path string) {
-	fmt.Print("Seguro que desea eliminar el archivo ? [S/N]: ")
+	fmt.Print("\033[1;33mSeguro que desea eliminar el archivo ? [S/N]: \033[0m")
 	val := ""
 	fmt.Scanln(&val)
 	if strings.ToLower(val) == "s" {
 
 		if err := os.Remove(path); err != nil {
-			fmt.Println("Error en la eliminacion del archivo")
+			fmt.Println("\033[1;31mError en la eliminacion del disco\033[0m")
 		} else {
-			fmt.Println("El archivo a sido eliminado exitsamente")
+			fmt.Println("\033[1;32mEl disco a sido eliminado exitosamente\033[0m")
 			desmontarDiscoEliminado(path)
 		}
+	} else {
+		fmt.Println("\033[1;31mEl disco no se a elminado\033[0m")
 	}
 }
 
