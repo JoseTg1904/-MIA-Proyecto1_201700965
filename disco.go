@@ -22,12 +22,11 @@ type discoMBR struct {
 
 //mkdisk
 func crearDisco(size int64, path, name, unit string) {
-
 	//conversion a tamaño en kilobytes o megabytes
 	if unit == "k" {
-		size = size * 1024
+		size *= 1024
 	} else {
-		size = size * 1048576
+		size *= 1048576
 	}
 
 	//creacion de carpetas necesarias para el almacenamiento del archivo
@@ -43,20 +42,20 @@ func crearDisco(size int64, path, name, unit string) {
 	archivo, _ := os.Create(path + name)
 	defer archivo.Close()
 
-	//obtencion de la fecha
-	tiempoActual := obtenerFecha()
+	//instancia de una particion vacia para el llenado del mbr
+	particionLimpia := particion{Inicio: -1}
 
 	//instancia del mbr y llenado de datos del mismo
-	mbr := discoMBR{}
-	mbr.Tamanio = size
-	mbr.Random = numRand
-	particionLimpia := particion{Inicio: -1}
-	mbr.Particiones[0] = particionLimpia
-	mbr.Particiones[1] = particionLimpia
-	mbr.Particiones[2] = particionLimpia
-	mbr.Particiones[3] = particionLimpia
+	mbr := discoMBR{Tamanio: size,
+		Random: numRand,
+		Particiones: [4]particion{particionLimpia,
+			particionLimpia,
+			particionLimpia,
+			particionLimpia}}
+	copy(mbr.Creacion[:], obtenerFecha())
+
+	//aumento del numero random que identifica al disco
 	numRand++
-	copy(mbr.Creacion[:], tiempoActual)
 
 	//llenado del archivo con valores de cero para obtener el tamaño especificado
 	buffer := bytes.NewBuffer([]byte{})
@@ -67,9 +66,11 @@ func crearDisco(size int64, path, name, unit string) {
 	archivo.Seek(size-int64(1), 0)
 	archivo.Write(buffer.Bytes())
 
-	//escritura del struct que representa el mbr en el archivo
+	//posicionando el puntero en el inicio del archivo y limpiando el buffer de escritura
 	archivo.Seek(0, 0)
 	buffer.Reset()
+
+	//escritura del struct que representa el mbr en el archivo
 	binary.Write(buffer, binary.BigEndian, &mbr)
 	archivo.Write(buffer.Bytes())
 
@@ -78,11 +79,10 @@ func crearDisco(size int64, path, name, unit string) {
 
 //rmdisk
 func eliminarDisco(path string) {
-	fmt.Print("\033[1;33mSeguro que desea eliminar el archivo ? [S/N]: \033[0m")
+	fmt.Print("\033[1;33mSeguro que desea eliminar el disco ? [S/N]: \033[0m")
 	val := ""
 	fmt.Scanln(&val)
 	if strings.ToLower(val) == "s" {
-
 		if err := os.Remove(path); err != nil {
 			fmt.Println("\033[1;31mError en la eliminacion del disco\033[0m")
 		} else {
@@ -90,7 +90,7 @@ func eliminarDisco(path string) {
 			desmontarDiscoEliminado(path)
 		}
 	} else {
-		fmt.Println("\033[1;31mEl disco no se a elminado\033[0m")
+		fmt.Println("\033[1;31mEl disco no a sido elminado\033[0m")
 	}
 }
 
