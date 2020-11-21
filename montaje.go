@@ -40,10 +40,12 @@ func montarParticion(path, name string) {
 		return
 	}
 
+	//variable que almacena la cantidad de discos montados y una bandera para indicar si el
+	//disco ya se encuentra montado
 	contadorDiscosMontados := 0
 	banderaDiscoMontado := false
-	i := 0
 
+	i := 0
 	for i = 0; i < 26; i++ {
 		if discosMontados[i] != discoVacio {
 			contadorDiscosMontados++
@@ -53,15 +55,16 @@ func montarParticion(path, name string) {
 			}
 		}
 	}
-
 	if i == 26 {
 		i = 25
 	}
 
+	//insercion de la particion en un disco que ya esta montado
 	if banderaDiscoMontado {
-
+		//variable que indica si se a montado la particion o si ya se encuentra montada
 		banderaParticionMontada := false
 		banderaParticionDuplicada := false
+
 		nombreAux := [16]byte{}
 		copy(nombreAux[:], name)
 
@@ -94,6 +97,8 @@ func montarParticion(path, name string) {
 			fmt.Println("\033[1;32mSe a montado la particion\033[0m")
 			return
 		}
+
+		//insercion del disco y la particion
 	} else {
 		if contadorDiscosMontados == 26 {
 			fmt.Println("\033[1;31mYa no se pueden montar mas discos\033[0m")
@@ -107,12 +112,11 @@ func montarParticion(path, name string) {
 				break
 			}
 		}
-
 		if k == 26 {
 			k = 25
 		}
 
-		particion := particionMontada{ID: 1}
+		particion := particionMontada{ID: 1, Perdida: false}
 		copy(particion.Nombre[:], name)
 		discosMontados[k].ParticionesMontadas[0] = particion
 
@@ -124,7 +128,9 @@ func validarExistenciaParticion(archivo *os.File, path, name string) bool {
 	mbrAux := obtenerMBR(archivo)
 
 	contExtendidas := 0
+	posicionActualEBR := int64(0)
 	banderaNombre := false
+
 	nombre := [16]byte{}
 	copy(nombre[:], name)
 
@@ -132,6 +138,7 @@ func validarExistenciaParticion(archivo *os.File, path, name string) bool {
 		if mbrAux.Particiones[i].Inicio != -1 {
 			if mbrAux.Particiones[i].Tipo == 'e' {
 				contExtendidas++
+				posicionActualEBR = mbrAux.Particiones[i].Inicio
 			}
 			if mbrAux.Particiones[i].Nombre == nombre {
 				banderaNombre = true
@@ -140,55 +147,59 @@ func validarExistenciaParticion(archivo *os.File, path, name string) bool {
 	}
 
 	if contExtendidas == 1 {
-		posicionActualEBR := int64(0)
-		for i := 0; i < 4; i++ {
-			if particionAux := mbrAux.Particiones[i]; particionAux.Inicio != -1 {
-				if particionAux.Tipo == 'e' {
-					posicionActualEBR = mbrAux.Particiones[i].Inicio
-				}
-			}
-		}
-
-		for {
-			ebrAux := obtnerEBR(archivo, posicionActualEBR)
-
-			if ebrAux.Nombre == nombre {
-				banderaNombre = true
-				break
-			}
-
-			if ebrAux.Siguiente == -1 {
-				break
-			}
-			posicionActualEBR = ebrAux.Siguiente
-		}
+		_, banderaNombre = verificacionExistenciaLogica(posicionActualEBR, archivo, nombre)
 	}
 
 	return banderaNombre
 }
 
-func desmontarParticion(id string) {
-	disco := string(id[2])
-	particion, _ := strconv.Atoi(id[3:len(id)])
+func recorridoObtenerDiscoMontado(idDisco string) (int, discoMontado) {
 	discoAux := discoMontado{}
-	vacia := particionMontada{}
-	banderaDesmontaje := false
-
 	i := 0
+
 	for i = 0; i < 26; i++ {
-		if discosMontados[i].ID == disco {
+		if discosMontados[i].ID == idDisco {
 			discoAux = discosMontados[i]
 			break
 		}
 	}
-
 	if i == 26 {
 		i = 25
 	}
 
+	return i, discoAux
+}
+
+func recorridoObtenerParticionMontada(idParticion int, discoAux discoMontado) (int, particionMontada) {
+	particionAux := particionMontada{}
+	i := 0
+
+	for i = 0; i < 100; i++ {
+		if discoAux.ParticionesMontadas[i].ID == idParticion {
+			particionAux = discoAux.ParticionesMontadas[i]
+			break
+		}
+	}
+	if i == 100 {
+		i = 99
+	}
+
+	return i, particionAux
+}
+
+func desmontarParticion(id string) {
+	//descomposicion del string que correspone a una particion montada en la letra que correspone
+	//al disco y el numero que corresponde a la particion
+	disco := string(id[2])
+	particion, _ := strconv.Atoi(id[3:len(id)])
+
+	banderaDesmontaje := false
+
+	i, discoAux := recorridoObtenerDiscoMontado(disco)
+
 	if discoAux != discoVacio {
 		for j := 0; j < 100; j++ {
-			if discosMontados[i].ParticionesMontadas[j] != vacia {
+			if discosMontados[i].ParticionesMontadas[j] != particionVacia {
 				if discosMontados[i].ParticionesMontadas[j].ID == particion {
 					discosMontados[i].ParticionesMontadas[j] = particionMontada{}
 					banderaDesmontaje = true
@@ -213,7 +224,10 @@ func mostrarParticionesMontadas() {
 		if discosMontados[i] != discoVacio {
 			for j := 0; j < 100; j++ {
 				if discosMontados[i].ParticionesMontadas[j] != particionVacia {
-					fmt.Println("id -> vd"+discosMontados[i].ID+strconv.Itoa(discosMontados[i].ParticionesMontadas[j].ID), " path ->", discosMontados[i].Path, " name ->", string(discosMontados[i].ParticionesMontadas[j].Nombre[:]))
+					fmt.Println("id -> vd"+discosMontados[i].ID+
+						strconv.Itoa(discosMontados[i].ParticionesMontadas[j].ID), " path ->",
+						discosMontados[i].Path, " name ->",
+						string(discosMontados[i].ParticionesMontadas[j].Nombre[:]))
 				}
 			}
 		}
@@ -225,27 +239,13 @@ func obtenerDiscoMontado(id string) (*os.File, uint32, uint32) {
 	disco := string(id[2])
 	particion, _ := strconv.Atoi(id[3:len(id)])
 
-	discoAux := discoMontado{}
-	particionAux := particionMontada{}
-
-	for i := 0; i < 26; i++ {
-		if discosMontados[i].ID == disco {
-			discoAux = discosMontados[i]
-			break
-		}
-	}
+	_, discoAux := recorridoObtenerDiscoMontado(disco)
 
 	if discoAux != discoVacio {
-		for i := 0; i < 100; i++ {
-			if discoAux.ParticionesMontadas[i].ID == particion {
-				particionAux = discoAux.ParticionesMontadas[i]
-				break
-			}
-		}
+		_, particionAux := recorridoObtenerParticionMontada(particion, discoAux)
 
 		if particionAux != particionVacia {
 			archivo := buscarDisco(discoAux.Path)
-
 			mbrAux := obtenerMBR(archivo)
 
 			tamanio, inicio := uint32(0), uint32(0)
@@ -260,12 +260,9 @@ func obtenerDiscoMontado(id string) (*os.File, uint32, uint32) {
 
 			return archivo, tamanio, inicio
 		}
-
-		fmt.Println("\033[1;31mLa particion no se a encontrado\033[0m")
+		fmt.Println("\033[1;31mLa particion no a sido encontrado\033[0m")
 		return nil, 0, 0
-
 	}
-
 	fmt.Println("\033[1;31mEl disco aun no se encuentrada montado\033[0m")
 	return nil, 0, 0
 }
@@ -289,8 +286,7 @@ func desmontarDiscoEliminado(path string) {
 
 func desmontarParticionEliminada(path, nombre string) {
 	discoAux := discoMontado{}
-	vacia := particionMontada{}
-	vacio := discoMontado{}
+
 	nombreAux := [16]byte{}
 	copy(nombreAux[:], nombre)
 
@@ -301,16 +297,15 @@ func desmontarParticionEliminada(path, nombre string) {
 			break
 		}
 	}
-
 	if i == 26 {
 		i = 25
 	}
 
-	if discoAux != vacio {
+	if discoAux != discoVacio {
 		for j := 0; j < 100; j++ {
-			if discosMontados[i].ParticionesMontadas[j] != vacia {
+			if discosMontados[i].ParticionesMontadas[j] != particionVacia {
 				if discosMontados[i].ParticionesMontadas[j].Nombre == nombreAux {
-					discosMontados[i].ParticionesMontadas[j] = vacia
+					discosMontados[i].ParticionesMontadas[j] = particionVacia
 					break
 				}
 			}
@@ -322,33 +317,10 @@ func cambiarEstadoPerdida(id string, estado bool) {
 	disco := string(id[2])
 	particion, _ := strconv.Atoi(id[3:len(id)])
 
-	discoAux := discoMontado{}
-	particionAux := particionMontada{}
-
-	j := 0
-	for j = 0; j < 26; j++ {
-		if discosMontados[j].ID == disco {
-			discoAux = discosMontados[j]
-			break
-		}
-	}
-
-	if j == 26 {
-		j = 25
-	}
+	j, discoAux := recorridoObtenerDiscoMontado(disco)
 
 	if discoAux != discoVacio {
-		i := 0
-		for i = 0; i < 100; i++ {
-			if discoAux.ParticionesMontadas[i].ID == particion {
-				particionAux = discoAux.ParticionesMontadas[i]
-				break
-			}
-		}
-
-		if i == 100 {
-			i = 99
-		}
+		i, particionAux := recorridoObtenerParticionMontada(particion, discoAux)
 
 		if particionAux != particionVacia {
 			discosMontados[j].ParticionesMontadas[i].Perdida = estado
@@ -366,33 +338,10 @@ func obtenerEstadoPerdida(id string) (bool, int64) {
 	disco := string(id[2])
 	particion, _ := strconv.Atoi(id[3:len(id)])
 
-	discoAux := discoMontado{}
-	particionAux := particionMontada{}
-
-	j := 0
-	for j = 0; j < 26; j++ {
-		if discosMontados[j].ID == disco {
-			discoAux = discosMontados[j]
-			break
-		}
-	}
-
-	if j == 26 {
-		j = 25
-	}
+	j, discoAux := recorridoObtenerDiscoMontado(disco)
 
 	if discoAux != discoVacio {
-		i := 0
-		for i = 0; i < 100; i++ {
-			if discosMontados[j].ParticionesMontadas[i].ID == particion {
-				particionAux = discoAux.ParticionesMontadas[i]
-				break
-			}
-		}
-
-		if i == 100 {
-			i = 99
-		}
+		i, particionAux := recorridoObtenerParticionMontada(particion, discoAux)
 
 		if particionAux != particionVacia {
 			return discosMontados[j].ParticionesMontadas[i].Perdida, discosMontados[j].ParticionesMontadas[i].InicioCopia

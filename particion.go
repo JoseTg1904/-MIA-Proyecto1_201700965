@@ -51,6 +51,8 @@ func crearParticion(size int64, unit, path, tipo, fit, name string) {
 	nombre := [16]byte{}
 	copy(nombre[:], name)
 
+	//validando la cantidad total de particiones, el nombre de la particion a crear y
+	//la cantidad de extendidas
 	for i := 0; i < 4; i++ {
 		if mbrAux.Particiones[i].Inicio != -1 {
 			if mbrAux.Particiones[i].Tipo == 'e' {
@@ -90,7 +92,6 @@ func crearParticion(size int64, unit, path, tipo, fit, name string) {
 	}
 
 	size = obtenerTamanioParticion(size, unit)
-
 	if size > (mbrAux.Tamanio - int64(unsafe.Sizeof(mbrAux))) {
 		fmt.Println("\033[1;31mEl tamaño de la particion excede la capacidad del disco\033[0m")
 		return
@@ -113,7 +114,6 @@ func crearParticion(size int64, unit, path, tipo, fit, name string) {
 	if tipo == "p" || tipo == "e" {
 		i := 0
 		for i = 0; i < 4; i++ {
-
 			//verificando que espacio se encuentra vacio en la tabla de particiones del mbr
 			if mbrAux.Particiones[i].Inicio == -1 {
 				if i == 0 {
@@ -206,10 +206,7 @@ func crearParticion(size int64, unit, path, tipo, fit, name string) {
 		//insercion de particion logica
 	} else {
 		//variables que almacenan el inicio y el tamaño de la particion extendida
-		inicio := int64(0)
-		tamanio := int64(0)
-
-		inicio, tamanio = obtenerInicioTamanioExtendida(mbrAux)
+		inicio, tamanio := obtenerInicioTamanioExtendida(mbrAux)
 
 		//quitandole al tamaño total de la particion extendida el tamaño de un EBR
 		tamanio -= int64(unsafe.Sizeof(logicaEBR{}))
@@ -244,7 +241,6 @@ func crearParticion(size int64, unit, path, tipo, fit, name string) {
 			escrbirEBR(archivo, posicionSiguiente, ebrAdjunta)
 
 			fmt.Println("\033[1;32mSe a insertado la particion logica\033[0m")
-			return
 		} else {
 			//variables que almacenan el tamaño de un ebr, la posicion del ebr actual y
 			//la del siguiente ebr
@@ -368,66 +364,40 @@ func modificarTamanioParticion(size int64, unit, path, name string) {
 	nombre := [16]byte{}
 	copy(nombre[:], name)
 
-	banderaNombre := false
-
-	i := 0
-	for i = 0; i < 4; i++ {
-		if mbrAux.Particiones[i].Inicio != -1 {
-			if mbrAux.Particiones[i].Nombre == nombre {
-				banderaNombre = true
-				break
-			}
-		}
-	}
-
-	if i == 4 {
-		i = 3
-	}
+	banderaNombre, i := verificacionExistenciaPrimariaExtendida(mbrAux, nombre)
 
 	banderaCambio := false
 
 	if banderaNombre {
 		if tamanioMod > 0 {
-			if i == 3 {
-				//verificacion del tamaño nuevo con el tamaño total del disco y la ultima particion
-				//en el disco
+			//buscando la particion contigua a la derecha de la que se busca aumentar su tamaño
+			j := i
+			for j = i; j < 4; j++ {
+				if mbrAux.Particiones[j].Inicio != -1 {
+					break
+				}
+			}
+			if j == 4 {
+				j = 3
+			}
+
+			//verificacion del espacio disponible con la particion contigua
+			if mbrAux.Particiones[j].Inicio != -1 && (j != i) {
+				if disponible := mbrAux.Particiones[j].Inicio - (mbrAux.Particiones[i].Inicio + mbrAux.Particiones[i].Tamanio); disponible >= tamanioMod {
+					mbrAux.Particiones[i].Tamanio += tamanioMod
+					banderaCambio = true
+				} else {
+					fmt.Println("\033[1;31mLa cantidad a agregar no puede ser aceptada por limitantes de espacio\033[0m")
+					return
+				}
+				//verificacion del espacio disponible con el tamaño total del disco
+			} else {
 				if disponible := mbrAux.Tamanio - (mbrAux.Particiones[i].Inicio + mbrAux.Particiones[i].Tamanio); disponible >= tamanioMod {
 					mbrAux.Particiones[i].Tamanio += tamanioMod
 					banderaCambio = true
 				} else {
-					fmt.Println("\033[1;31mLa cantida a agregar no puede ser aceptada por limitantes de espacio\033[0m")
+					fmt.Println("\033[1;31mLa cantidad a agregar no puede ser aceptada por limitantes de espacio\033[0m")
 					return
-				}
-			} else {
-				//buscando la particion contigua a la derecha de la que se busca aumentar su tamaño
-				j := i
-				for j = i; j < 4; j++ {
-					if mbrAux.Particiones[j].Inicio != -1 {
-						break
-					}
-				}
-				if j == 4 {
-					j = 3
-				}
-
-				//verificacion del espacio disponible con la particion contigua
-				if mbrAux.Particiones[j].Inicio != -1 {
-					if disponible := mbrAux.Particiones[j].Inicio - (mbrAux.Particiones[i].Inicio + mbrAux.Particiones[i].Tamanio); disponible >= tamanioMod {
-						mbrAux.Particiones[i].Tamanio += tamanioMod
-						banderaCambio = true
-					} else {
-						fmt.Println("\033[1;31mLa cantidad a agregar no puede ser aceptada por limitantes de espacio\033[0m")
-						return
-					}
-					//verificacion del espacio disponible con el tamaño total del disco
-				} else {
-					if disponible := mbrAux.Tamanio - (mbrAux.Particiones[i].Inicio + mbrAux.Particiones[i].Tamanio); disponible >= tamanioMod {
-						mbrAux.Particiones[i].Tamanio += tamanioMod
-						banderaCambio = true
-					} else {
-						fmt.Println("\033[1;31mLa cantidad a agregar no puede ser aceptada por limitantes de espacio\033[0m")
-						return
-					}
 				}
 			}
 		} else if tamanioMod < 0 {
@@ -442,9 +412,7 @@ func modificarTamanioParticion(size int64, unit, path, name string) {
 		}
 		//verificando si se encuentra en las logicas la particion a modificar
 	} else {
-		posicionActualEBR := int64(0)
-
-		posicionActualEBR, _ = obtenerInicioTamanioExtendida(mbrAux)
+		posicionActualEBR, _ := obtenerInicioTamanioExtendida(mbrAux)
 
 		if posicionActualEBR == 0 {
 			fmt.Println("\033[1;31mLa particion a modificar no se encuentra en el sistema\033[0m")
@@ -514,27 +482,14 @@ func verificacionExistenciaLogica(posicionEBR int64, disco *os.File, nombre [16]
 	return posicionEBR, bandera
 }
 
-func eliminarParticion(path, name, tipoELiminacion string) {
-
-	archivo := obtenerDisco(path)
-	defer archivo.Close()
-	if archivo == nil {
-		fmt.Println("\033[1;31mEl disco aun no a sido creado\033[0m")
-		return
-	}
-
-	mbrAux := obtenerMBR(archivo)
-
-	banderaEncontrado := false
-
-	nombre := [16]byte{}
-	copy(nombre[:], name)
-
+func verificacionExistenciaPrimariaExtendida(mbrAux discoMBR, nombre [16]byte) (bool, int) {
+	bandera := false
 	i := 0
+
 	for i = 0; i < 4; i++ {
 		if mbrAux.Particiones[i].Inicio != -1 {
 			if mbrAux.Particiones[i].Nombre == nombre {
-				banderaEncontrado = true
+				bandera = true
 				break
 			}
 		}
@@ -543,26 +498,56 @@ func eliminarParticion(path, name, tipoELiminacion string) {
 		i = 3
 	}
 
+	return bandera, i
+}
+
+func eliminarParticion(path, name, tipoELiminacion string) {
+	archivo := obtenerDisco(path)
+	defer archivo.Close()
+
+	if archivo == nil {
+		fmt.Println("\033[1;31mEl disco aun no a sido creado\033[0m")
+		return
+	}
+
+	mbrAux := obtenerMBR(archivo)
+
+	nombre := [16]byte{}
+	copy(nombre[:], name)
+
+	banderaEncontrado, i := verificacionExistenciaPrimariaExtendida(mbrAux, nombre)
+
+	//proceso de eliminacion para primarias o extendidas
 	if banderaEncontrado {
+		//si es eliminacion full se borra todo el contenido de la particion
+		//y se borra de la tabla de particiones
 		if tipoELiminacion == "full" {
 			archivo.Seek(mbrAux.Particiones[i].Inicio, 0)
 			buffer := bytes.NewBuffer([]byte{})
 			binary.Write(buffer, binary.BigEndian, int8(0))
+
 			for k := mbrAux.Particiones[i].Inicio; k <= mbrAux.Particiones[i].Tamanio; k++ {
 				archivo.Write(buffer.Bytes())
 			}
+
 			fmt.Println("\033[1;32mEliminacion de particion completa, realizada con exito\033[0m")
+			//si es eliminacion fast solo se elimina de la tabla de particiones
 		} else if tipoELiminacion == "fast" {
 			fmt.Println("\033[1;32mEliminacion de particion rapida, realizada con exito\033[0m")
 		}
+		//proceso que comparten ambas eliminaciones que es eliminar de la tabla de particiones
+		//y el desmontaje de la unidad si lo estuviera
 		mbrAux.Particiones[i] = particion{Inicio: -1}
 		desmontarParticionEliminada(path, name)
 		escribirEnDisco(archivo, mbrAux)
+
+		//proceso de eliminacion para logicas
 	} else {
-		posicionActualEBR := int64(0)
+		//variable que almacena el inicio de la particion extendida que contiene las logicas
 		inicioExtendida := int64(0)
 
-		posicionActualEBR, _ = obtenerInicioTamanioExtendida(mbrAux)
+		//obtencion de la posicion del ebr inicial
+		posicionActualEBR, _ := obtenerInicioTamanioExtendida(mbrAux)
 		inicioExtendida = posicionActualEBR
 
 		if posicionActualEBR == 0 {
@@ -570,95 +555,83 @@ func eliminarParticion(path, name, tipoELiminacion string) {
 			return
 		}
 
-		_, banderaNombre := verificacionExistenciaLogica(posicionActualEBR, archivo, nombre)
+		//modificacion de la posicion del ebr inicial hacia el ebr a eliminar
+		posicionActualEBR, banderaNombre := verificacionExistenciaLogica(posicionActualEBR, archivo, nombre)
 
 		if banderaNombre {
 			if tipoELiminacion == "full" {
-				if posicionActualEBR == inicioExtendida {
-					ebrEliminar := obtnerEBR(archivo, posicionActualEBR)
-					buffer := bytes.NewBuffer([]byte{})
-					binary.Write(buffer, binary.BigEndian, int8(0))
-					archivo.Seek(ebrEliminar.Inicio+int64(unsafe.Sizeof(logicaEBR{})), 0)
-
-					for k := ebrEliminar.Inicio + int64(unsafe.Sizeof(logicaEBR{})); k <= ebrEliminar.Tamanio; k++ {
-						archivo.Write(buffer.Bytes())
-					}
-					ebrEliminar.Tamanio = -1
-					ebrEliminar.Nombre = [16]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-					ebrEliminar.Ajuste = [2]byte{0, 0}
-					escrbirEBR(archivo, posicionActualEBR, ebrEliminar)
-					desmontarParticionEliminada(path, name)
-					fmt.Println("\033[1;32mEliminacion de particion completa, realizada con exito\033[0m")
-				} else {
-					posicionSiguiente := int64(0)
-					for {
-						ebrAux := obtnerEBR(archivo, inicioExtendida)
-						posicionSiguiente = ebrAux.Siguiente
-						ebrSiguiente := obtnerEBR(archivo, posicionSiguiente)
-						if ebrSiguiente.Nombre == nombre {
-							banderaNombre = true
-							break
-						}
-						inicioExtendida = ebrAux.Siguiente
-					}
-					ebrEliminar := obtnerEBR(archivo, posicionActualEBR)
-					ebrAnterior := obtnerEBR(archivo, inicioExtendida)
-					ebrAnterior.Siguiente = ebrEliminar.Siguiente
-					escrbirEBR(archivo, inicioExtendida, ebrAnterior)
-					buffer := bytes.NewBuffer([]byte{})
-					binary.Write(buffer, binary.BigEndian, int8(0))
-					for k := ebrEliminar.Inicio; k <= (ebrEliminar.Tamanio); k++ {
-						archivo.Write(buffer.Bytes())
-					}
-					desmontarParticionEliminada(path, name)
-					fmt.Println("\033[1;32mEliminacion de particion completa, realzada con exito\033[0m")
-					return
-				}
+				eliminacionParticionLogica(inicioExtendida, posicionActualEBR, archivo, path, name, nombre)
+				fmt.Println("\033[1;32mEliminacion de particion completa, realzada con exito\033[0m")
 			} else if tipoELiminacion == "fast" {
-				if posicionActualEBR == inicioExtendida {
-					ebrEliminar := obtnerEBR(archivo, posicionActualEBR)
-					buffer := bytes.NewBuffer([]byte{})
-					binary.Write(buffer, binary.BigEndian, int8(0))
-					for k := ebrEliminar.Inicio + int64(unsafe.Sizeof(logicaEBR{})); k <= (ebrEliminar.Tamanio); k++ {
-						archivo.Write(buffer.Bytes())
-					}
-					ebrEliminar.Tamanio = -1
-					ebrEliminar.Nombre = [16]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-					ebrEliminar.Ajuste = [2]byte{0, 0}
-					escrbirEBR(archivo, posicionActualEBR, ebrEliminar)
-					desmontarParticionEliminada(path, name)
-					fmt.Println("\033[1;32mEliminacion de particion rapida, realizada con exito\033[0m")
-				} else {
-					posicionSiguiente := int64(0)
-					for {
-						ebrAux := obtnerEBR(archivo, inicioExtendida)
-						posicionSiguiente = ebrAux.Siguiente
-						ebrSiguiente := obtnerEBR(archivo, posicionSiguiente)
-						if ebrSiguiente.Nombre == nombre {
-							banderaNombre = true
-							break
-						}
-						inicioExtendida = ebrAux.Siguiente
-					}
-					ebrEliminar := obtnerEBR(archivo, posicionActualEBR)
-					ebrAnterior := obtnerEBR(archivo, inicioExtendida)
-					ebrAnterior.Siguiente = ebrEliminar.Siguiente
-					escrbirEBR(archivo, inicioExtendida, ebrAnterior)
-					buffer := bytes.NewBuffer([]byte{})
-					binary.Write(buffer, binary.BigEndian, int8(0))
-					for k := ebrEliminar.Inicio; k <= (ebrEliminar.Tamanio); k++ {
-						archivo.Write(buffer.Bytes())
-					}
-					desmontarParticionEliminada(path, name)
-					fmt.Println("\033[1;32mEliminacion de particion rapida, relizada con exito\033[0m")
-					return
-				}
+				eliminacionParticionLogica(inicioExtendida, posicionActualEBR, archivo, path, name, nombre)
+				fmt.Println("\033[1;32mEliminacion de particion rapida, realizada con exito\033[0m")
 			}
 		} else {
 			fmt.Println("\033[1;31mLa particion no se a encontrado en el sistema\033[0m")
 			return
 		}
 	}
+}
+
+func eliminacionParticionLogica(inicioExtendida, posicionActualEBR int64, archivo *os.File, path, name string, nombre [16]byte) {
+	//validacion de eliminacion del ebr inicial de la particion extendida
+	if posicionActualEBR == inicioExtendida {
+		//obtencion del ebr inicial
+		ebrEliminar := obtnerEBR(archivo, posicionActualEBR)
+
+		//creacion del buffer para escribir ceros en la particion logica
+		buffer := bytes.NewBuffer([]byte{})
+		binary.Write(buffer, binary.BigEndian, int8(0))
+
+		//posicionandose en el inicio de la particion logica
+		archivo.Seek(ebrEliminar.Inicio+int64(unsafe.Sizeof(logicaEBR{})), 0)
+
+		//borrando el contenido de la particion logica
+		for k := ebrEliminar.Inicio + int64(unsafe.Sizeof(logicaEBR{})); k <= ebrEliminar.Tamanio; k++ {
+			archivo.Write(buffer.Bytes())
+		}
+
+		//modificando a valores por defecto el ebr inicial
+		ebrEliminar.Tamanio = -1
+		ebrEliminar.Nombre = [16]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+
+		escrbirEBR(archivo, posicionActualEBR, ebrEliminar)
+
+		//eliminacion de
+	} else {
+		//variable que almacena la posicion del ebr a eliminar
+		posicionSiguiente := int64(0)
+
+		//ciclo infinito que se cumple hasta que se encuentra el ebr a eliminar
+		//con este se busca dejar la posicion del ebr anterior al que
+		//se desea eliminar en la variable inicioExtendida
+		for {
+			ebrAux := obtnerEBR(archivo, inicioExtendida)
+
+			posicionSiguiente = ebrAux.Siguiente
+			ebrSiguiente := obtnerEBR(archivo, posicionSiguiente)
+
+			if ebrSiguiente.Nombre == nombre {
+				break
+			}
+
+			inicioExtendida = ebrAux.Siguiente
+		}
+
+		ebrEliminar := obtnerEBR(archivo, posicionActualEBR)
+		ebrAnterior := obtnerEBR(archivo, inicioExtendida)
+
+		ebrAnterior.Siguiente = ebrEliminar.Siguiente
+		escrbirEBR(archivo, inicioExtendida, ebrAnterior)
+
+		buffer := bytes.NewBuffer([]byte{})
+		binary.Write(buffer, binary.BigEndian, int8(0))
+
+		for k := ebrEliminar.Inicio; k <= (ebrEliminar.Tamanio); k++ {
+			archivo.Write(buffer.Bytes())
+		}
+	}
+	desmontarParticionEliminada(path, name)
 }
 
 func obtenerInicioTamanioExtendida(mbrAux discoMBR) (int64, int64) {
@@ -688,11 +661,9 @@ func obtenerTamanioParticion(size int64, unit string) int64 {
 	if unit == "b" {
 		return size
 	} else if unit == "k" {
-		size *= 1024
-		return size
+		return size * 1024
 	} else if unit == "m" {
-		size *= 1048576
-		return size
+		return size * 1048576
 	}
 	return int64(0)
 }
@@ -701,14 +672,9 @@ func obtenerMBR(archivo *os.File) discoMBR {
 	mbrAux := discoMBR{}
 	contenido := make([]byte, int(unsafe.Sizeof(mbrAux)))
 	archivo.Seek(0, 0)
-	_, err := archivo.Read(contenido)
-	if err != nil {
-		fmt.Println("Error en la lectura del disco")
-	}
+	archivo.Read(contenido)
 	buffer := bytes.NewBuffer(contenido)
-	a := binary.Read(buffer, binary.BigEndian, &mbrAux)
-	if a != nil {
-	}
+	binary.Read(buffer, binary.BigEndian, &mbrAux)
 	return mbrAux
 }
 

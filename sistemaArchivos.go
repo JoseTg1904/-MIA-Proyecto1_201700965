@@ -108,7 +108,7 @@ type bitacora struct {
 
 func calcularNoEstructras(tamanioParticion uint32) (uint32, uint32, uint32) {
 	/*
-		Modelo matemacio:
+		Modelo matematico:
 		No Estructuras = (TamañoDeParticion - (2*TamañoDelSuperbloque)) /
 		(27+TamArbolVirtual+TamDetalleDirectorio+(5*TamInodo+(20*TamBloque)+Bitacora))
 	*/

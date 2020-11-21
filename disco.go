@@ -23,11 +23,7 @@ type discoMBR struct {
 //mkdisk
 func crearDisco(size int64, path, name, unit string) {
 	//conversion a tamaño en kilobytes o megabytes
-	if unit == "k" {
-		size *= 1024
-	} else {
-		size *= 1048576
-	}
+	size = obtenerTamanioParticion(size, unit)
 
 	//creacion de carpetas necesarias para el almacenamiento del archivo
 	exec.Command("mkdir", "-p", path).Output()
